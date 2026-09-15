@@ -126,7 +126,6 @@ def classify_day_type(open_price, high_price, low_price, close_price, intraday):
             "earlyMovePct": early_move * 100,
         }
 
-    # Daily-OHLC fallback if intraday candles are temporarily unavailable.
     if body_ratio >= 0.55 and (close_pos >= 0.78 or close_pos <= 0.22):
         return "Trend", {"bodyRatio": body_ratio, "closePosition": close_pos, "efficiency": None}
     return "Range", {"bodyRatio": body_ratio, "closePosition": close_pos, "efficiency": None}
@@ -244,13 +243,23 @@ class Handler(SimpleHTTPRequestHandler):
 
         if parsed.path in ("/", "/index.html"):
             html = (ROOT / "index.html").read_text(encoding="utf-8")
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            supabase_key = (os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or "").strip()
+            auth_config = json.dumps({
+                "supabaseUrl": supabase_url,
+                "supabasePublishableKey": supabase_key,
+            }).replace("</", "<\\/")
             html = html.replace(
                 "</head>",
-                '<link rel="stylesheet" href="auto-score.css?v=1"></head>',
+                f'<script>window.MFT_AUTH_CONFIG={auth_config};</script>'
+                '<link rel="stylesheet" href="auto-score.css?v=1">'
+                '<link rel="stylesheet" href="auth-v2.css?v=1"></head>',
             )
             html = html.replace(
                 "</body>",
-                '<script src="auto-score.js?v=1"></script></body>',
+                '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>'
+                '<script src="auto-score.js?v=1"></script>'
+                '<script src="auth-v2.js?v=1"></script></body>',
             )
             body = html.encode("utf-8")
             self.send_response(200)
@@ -265,13 +274,19 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers if False else None
         super().end_headers()
 
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
     token_state = "configured" if (os.getenv("UPSTOX_ANALYTICS_TOKEN") or os.getenv("UPSTOX_ACCESS_TOKEN")) else "NOT configured"
+    auth_state = "configured" if (os.getenv("SUPABASE_URL") and (os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("SUPABASE_ANON_KEY"))) else "NOT configured"
     print(f"Market Forward Test server: http://localhost:{port}")
     print(f"Upstox analytics token: {token_state}")
-    print("Tip: export UPSTOX_ANALYTICS_TOKEN='your_token' before starting for automatic scoring.")
+    print(f"Supabase OTP auth: {auth_state}")
+    if token_state != "configured":
+        print("Tip: export UPSTOX_ANALYTICS_TOKEN='your_token' for automatic scoring.")
+    if auth_state != "configured":
+        print("Tip: export SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to activate secure OTP sign-in.")
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
