@@ -15,7 +15,7 @@ function applyTheme(theme){
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', next === 'light' ? '#f5efe7' : '#100d13');
+  if (meta) meta.setAttribute('content', next === 'light' ? '#f7f3ee' : '#120f17');
   document.querySelectorAll('.theme-toggle').forEach(btn => {
     const icon = btn.querySelector('.theme-toggle-icon');
     const label = btn.querySelector('.theme-toggle-label');
@@ -27,7 +27,23 @@ function applyTheme(theme){
 }
 
 function toggleTheme(){
-  applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  if (!document.startViewTransition || reduceMotion) {
+    applyTheme(next);
+    return;
+  }
+
+  const root = document.documentElement;
+  root.dataset.themeTransition = next;
+  root.classList.add('theme-switching');
+
+  const transition = document.startViewTransition(() => applyTheme(next));
+  transition.finished.finally(() => {
+    delete root.dataset.themeTransition;
+    root.classList.remove('theme-switching');
+  });
 }
 
 function indiaDateKey(date = new Date()) {
