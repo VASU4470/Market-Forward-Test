@@ -1,11 +1,15 @@
-const CACHE = 'market-forward-test-v2-6';
+const CACHE = 'market-forward-test-v2-7';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=2.2',
   './theme.css?v=2.3',
   './brand.css?v=2.4',
+  './auth-v2.css?v=1',
   './app.js?v=2.3',
+  './auth-v2.js?v=1',
+  './auto-score.css?v=1',
+  './auto-score.js?v=1',
   './manifest.webmanifest?v=2.4',
   './icon.svg?v=2.4'
 ];
