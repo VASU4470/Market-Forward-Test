@@ -1,4 +1,4 @@
-const CACHE = 'market-forward-test-v2-4';
+const CACHE = 'market-forward-test-v2-5';
 const ASSETS = [
   './',
   './index.html',
