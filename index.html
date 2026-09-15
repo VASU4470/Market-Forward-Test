@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#111827" />
   <meta name="description" content="Market Forward Test — Predict. Lock. Score. Improve." />
-  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.1" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2.1" />
   <title>Market Forward Test</title>
 </head>
 <body>
@@ -16,13 +16,13 @@
       <div class="brand-mark large">M</div>
       <div class="eyebrow">MARKET FORWARD TEST</div>
       <h1>Build your market-reading record.</h1>
-      <p class="muted">Create a local profile to keep your predictions, scores and history separate on this device.</p>
+      <p class="muted">Create a profile to keep your predictions, scores and history separate on this device.</p>
       <form id="authForm">
         <label class="field-label"><span>Display name</span><input id="authName" autocomplete="name" placeholder="Your name" required /></label>
         <label class="field-label"><span>Email</span><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required /></label>
-        <button class="primary-btn" type="submit">CONTINUE</button>
+        <button class="primary-btn" type="submit">CREATE / SIGN IN</button>
       </form>
-      <p class="fineprint">V2 test mode: this profile is stored only in this browser. No password or broker account is required.</p>
+      <p class="fineprint">Test mode: this profile is stored only in this browser. No password or broker account is required.</p>
       <div id="existingProfiles" class="existing-profiles"></div>
     </div>
   </section>
@@ -38,7 +38,9 @@
       </div>
       <div class="top-actions">
         <button id="langToggle" class="ghost-btn" type="button">தமிழ்</button>
-        <button id="profileButton" class="avatar-btn" type="button" aria-label="Open profile"><span id="avatarInitial">U</span></button>
+        <button id="profileButton" class="profile-pill" type="button" aria-label="Open profile">
+          <span class="avatar-btn" id="avatarInitial">U</span><span class="profile-pill-label">Profile</span>
+        </button>
       </div>
     </header>
 
@@ -159,7 +161,7 @@
           <button class="primary-btn" type="submit">SAVE PROFILE</button>
         </form>
         <button id="signOutBtn" class="danger-btn" type="button">SIGN OUT / SWITCH PROFILE</button>
-        <p class="fineprint">This V2 test profile is local to this browser. Cloud login and cross-device history will come with the production backend.</p>
+        <p class="fineprint">This test profile is local to this browser. Cloud login and cross-device history will come with the production backend.</p>
       </section>
     </main>
 
@@ -183,6 +185,6 @@
     </div>
   </dialog>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>
