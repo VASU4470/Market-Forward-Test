@@ -3,188 +3,240 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#111827" />
+  <meta name="theme-color" content="#080b12" />
   <meta name="description" content="Market Forward Test — Predict. Lock. Score. Improve." />
-  <link rel="manifest" href="manifest.webmanifest?v=2.1" />
-  <link rel="icon" href="icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=2.1" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.2" />
+  <link rel="icon" href="icon.svg?v=2.2" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css?v=2.2" />
   <title>Market Forward Test</title>
 </head>
 <body>
   <section id="authScreen" class="auth-screen">
-    <div class="auth-card">
-      <div class="brand-mark large">M</div>
-      <div class="eyebrow">MARKET FORWARD TEST</div>
-      <h1>Build your market-reading record.</h1>
-      <p class="muted">Create a profile to keep your predictions, scores and history separate on this device.</p>
-      <form id="authForm">
-        <label class="field-label"><span>Display name</span><input id="authName" autocomplete="name" placeholder="Your name" required /></label>
-        <label class="field-label"><span>Email</span><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required /></label>
-        <button class="primary-btn" type="submit">CREATE / SIGN IN</button>
-      </form>
-      <p class="fineprint">Test mode: this profile is stored only in this browser. No password or broker account is required.</p>
-      <div id="existingProfiles" class="existing-profiles"></div>
+    <div class="auth-layout">
+      <div class="auth-brand-panel">
+        <div class="brand-lockup large-lockup">
+          <div class="brand-symbol">M</div>
+          <div><strong>Market Forward Test</strong><span>Decision intelligence for Indian markets</span></div>
+        </div>
+        <div class="auth-message">
+          <span class="product-kicker">BUILD A VERIFIED TRACK RECORD</span>
+          <h1>Read the market.<br><em>Prove it.</em></h1>
+          <p>Record your market view before the session, lock it, and measure your accuracy without hindsight.</p>
+        </div>
+        <div class="auth-proof-grid">
+          <div><span>01</span><b>Predict</b><small>State your view before the market.</small></div>
+          <div><span>02</span><b>Lock</b><small>Keep the thesis timestamped.</small></div>
+          <div><span>03</span><b>Improve</b><small>Learn from your own history.</small></div>
+        </div>
+      </div>
+
+      <div class="auth-card-wrap">
+        <div class="auth-card">
+          <div class="mobile-auth-brand">
+            <div class="brand-symbol">M</div><strong>Market Forward Test</strong>
+          </div>
+          <span class="section-kicker">WELCOME</span>
+          <h2>Your market record starts here.</h2>
+          <p class="muted">Create a profile to keep your predictions, scores and history separate on this device.</p>
+          <form id="authForm">
+            <label class="field-label"><span>Display name</span><input id="authName" autocomplete="name" placeholder="Your name" required /></label>
+            <label class="field-label"><span>Email</span><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required /></label>
+            <button class="primary-btn" type="submit">CREATE / SIGN IN <span>→</span></button>
+          </form>
+          <p class="fineprint">Test mode · Stored only in this browser · No broker credentials required</p>
+          <div id="existingProfiles" class="existing-profiles"></div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <div id="appShell" class="app-shell hidden">
-    <header class="topbar">
-      <div class="brand-row">
-        <div class="brand-mark">M</div>
-        <div>
-          <h1>Market Forward Test</h1>
-          <p>Predict. Lock. Score. Improve.</p>
-        </div>
+  <div id="appShell" class="platform-shell hidden">
+    <aside class="sidebar">
+      <div class="brand-lockup">
+        <div class="brand-symbol">M</div>
+        <div><strong>Market Forward Test</strong><span>India · Beta</span></div>
       </div>
-      <div class="top-actions">
-        <button id="langToggle" class="ghost-btn" type="button">தமிழ்</button>
-        <button id="profileButton" class="profile-pill" type="button" aria-label="Open profile">
-          <span class="avatar-btn" id="avatarInitial">U</span><span class="profile-pill-label">Profile</span>
+
+      <div class="sidebar-section">
+        <span class="sidebar-label">WORKSPACE</span>
+        <button class="nav-item active" data-target="today" type="button">
+          <svg viewBox="0 0 24 24"><path d="M4 12.5 12 5l8 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>
+          <span>Forward Test</span>
+        </button>
+        <button class="nav-item" data-target="result" type="button">
+          <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>
+          <span>Session Result</span>
+        </button>
+        <button class="nav-item" data-target="history" type="button">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg>
+          <span>History</span>
+        </button>
+        <button class="nav-item" data-target="score" type="button">
+          <svg viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/></svg>
+          <span>My Score</span>
         </button>
       </div>
-    </header>
 
-    <main>
-      <section id="today" class="view active">
-        <div class="hero-card">
-          <div class="eyebrow" id="todayLabel">TODAY · NIFTY</div>
-          <h2 id="dateHeading"></h2>
-          <p class="muted" id="todayIntro">Record your pre-market view and lock it before the session.</p>
-        </div>
-        <div id="lockedBanner" class="locked-banner hidden"></div>
-        <form id="predictionForm" class="card form-card">
-          <div class="section-head"><div><span class="step">01</span><h3 id="biasQuestion">What is your Nifty bias?</h3></div></div>
-          <div class="choice-grid three" data-group="bias">
-            <button type="button" class="choice" data-value="Bullish">🟢 <span>Bullish</span></button>
-            <button type="button" class="choice" data-value="Sideways">⚪ <span>Sideways</span></button>
-            <button type="button" class="choice" data-value="Bearish">🔴 <span>Bearish</span></button>
-          </div>
-          <div class="divider"></div>
-          <div class="section-head"><div><span class="step">02</span><h3 id="openQuestion">Expected opening?</h3></div></div>
-          <div class="choice-grid three" data-group="opening">
-            <button type="button" class="choice" data-value="Gap Up">↑ <span>Gap up</span></button>
-            <button type="button" class="choice" data-value="Flat">— <span>Flat</span></button>
-            <button type="button" class="choice" data-value="Gap Down">↓ <span>Gap down</span></button>
-          </div>
-          <div class="divider"></div>
-          <div class="section-head"><div><span class="step">03</span><h3 id="dayQuestion">Expected day type?</h3></div></div>
-          <div class="choice-grid three" data-group="dayType">
-            <button type="button" class="choice" data-value="Trend">↗ <span>Trend</span></button>
-            <button type="button" class="choice" data-value="Range">↔ <span>Range</span></button>
-            <button type="button" class="choice" data-value="Reversal">⤴ <span>Reversal</span></button>
-          </div>
-          <div class="divider"></div>
-          <div class="section-head"><div><span class="step">04</span><h3 id="levelsQuestion">Key levels</h3></div></div>
-          <div class="input-grid">
-            <label><span id="supportLabel">Support</span><input id="support" inputmode="decimal" type="number" step="0.05" placeholder="e.g. 25180" /></label>
-            <label><span id="resistanceLabel">Resistance</span><input id="resistance" inputmode="decimal" type="number" step="0.05" placeholder="e.g. 25420" /></label>
-          </div>
-          <button id="lockBtn" class="primary-btn" type="submit">🔒 LOCK MY VIEW</button>
-          <p class="fineprint" id="lockFineprint">Once locked, today's prediction cannot be edited.</p>
-        </form>
-      </section>
+      <div class="sidebar-future">
+        <span class="sidebar-label">PLATFORM</span>
+        <div class="future-item"><span class="future-dot"></span><div><b>More tools coming</b><small>Markets · Investing · Broker</small></div></div>
+      </div>
 
-      <section id="result" class="view">
-        <div class="hero-card compact">
-          <div class="eyebrow">TODAY'S RESULT</div>
-          <h2>Prediction score</h2>
-          <p class="muted">Enter the actual market outcome below. In production this can be automated from a licensed data feed.</p>
-        </div>
-        <div id="scorePanel" class="score-card hidden">
-          <div class="score-ring"><span id="scoreValue">0</span><small>/100</small></div>
-          <div id="scoreInsight" class="score-insight"></div>
-          <div id="scoreBreakdown" class="score-breakdown"></div>
-        </div>
-        <form id="actualForm" class="card form-card">
-          <h3>Actual market outcome</h3>
-          <label class="select-label"><span>Direction</span><select id="actualBias"><option>Bullish</option><option>Sideways</option><option>Bearish</option></select></label>
-          <label class="select-label"><span>Opening</span><select id="actualOpening"><option>Gap Up</option><option>Flat</option><option>Gap Down</option></select></label>
-          <label class="select-label"><span>Day type</span><select id="actualDayType"><option>Trend</option><option>Range</option><option>Reversal</option></select></label>
-          <div class="input-grid">
-            <label><span>Actual low</span><input id="actualLow" inputmode="decimal" type="number" step="0.05" /></label>
-            <label><span>Actual high</span><input id="actualHigh" inputmode="decimal" type="number" step="0.05" /></label>
-          </div>
-          <button class="primary-btn" type="submit">CALCULATE SCORE</button>
-        </form>
-      </section>
+      <div class="sidebar-foot">
+        <span class="status-dot"></span><span>Market tools in beta</span>
+      </div>
+    </aside>
 
-      <section id="history" class="view">
-        <div class="hero-card compact">
-          <div class="eyebrow">HISTORY</div>
-          <h2>Your market-reading record</h2>
-          <p class="muted">Choose how much of your personal history you want to review.</p>
+    <div class="workspace-shell">
+      <header class="topbar">
+        <div class="mobile-brand">
+          <div class="brand-symbol small">M</div>
+          <div><strong>Market Forward Test</strong><span>India · Beta</span></div>
         </div>
-        <div class="filter-row card">
-          <button class="filter-chip active" data-history-filter="all">All</button>
-          <button class="filter-chip" data-history-filter="7">Last 7</button>
-          <button class="filter-chip" data-history-filter="30">Last 30</button>
-          <button class="filter-chip" data-history-filter="scored">Scored</button>
+        <div class="topbar-context">
+          <span class="context-label">MARKET WORKSPACE</span>
+          <strong>Forward Test</strong>
         </div>
-        <div id="historySummary" class="history-summary"></div>
-        <div id="historyList" class="history-list"></div>
-      </section>
+        <div class="top-actions">
+          <button id="langToggle" class="utility-btn" type="button">தமிழ்</button>
+          <button id="profileButton" class="profile-pill" type="button" aria-label="Open profile">
+            <span class="avatar-btn" id="avatarInitial">U</span>
+            <span class="profile-pill-copy"><small>ACCOUNT</small><b>Profile</b></span>
+            <span class="chevron">⌄</span>
+          </button>
+        </div>
+      </header>
 
-      <section id="score" class="view">
-        <div class="hero-card compact">
-          <div class="eyebrow">MY SCORE</div>
-          <h2>Market Reading Score</h2>
-          <p class="muted">A simple view of what you read well—and what needs work.</p>
-        </div>
-        <div class="profile-score card">
-          <div><span class="big-score" id="avgScore">—</span><small>/100</small></div>
-          <p id="profileSessions">No scored sessions yet</p>
-        </div>
-        <div id="skillBars" class="card"></div>
-      </section>
+      <main class="workspace-content">
+        <section id="today" class="view active">
+          <div class="page-heading">
+            <div><span class="section-kicker" id="todayLabel">TODAY · NIFTY</span><h1 id="dateHeading"></h1><p class="muted" id="todayIntro">Record your pre-market view and lock it before the session.</p></div>
+            <div class="market-chip"><span class="live-dot"></span><div><small>MARKET</small><b>NIFTY 50</b></div></div>
+          </div>
 
-      <section id="profile" class="view">
-        <div class="hero-card compact">
-          <div class="eyebrow">PROFILE</div>
-          <h2 id="profileNameHeading">Your profile</h2>
-          <p class="muted">Your personal forward-test record on this device.</p>
-        </div>
-        <div class="card profile-card">
-          <div class="profile-identity">
-            <div class="profile-avatar" id="profileAvatar">U</div>
-            <div><h3 id="profileDisplayName">User</h3><p id="profileEmail" class="muted"></p></div>
+          <div id="lockedBanner" class="locked-banner hidden"></div>
+
+          <form id="predictionForm" class="panel prediction-panel">
+            <div class="panel-head"><div><span class="section-kicker">PRE-MARKET THESIS</span><h2>Define today's market view</h2></div><span class="panel-note">4 inputs · ~30 sec</span></div>
+
+            <div class="question-block">
+              <div class="question-title"><span class="step">01</span><div><h3 id="biasQuestion">What is your Nifty bias?</h3><p>Choose the dominant direction you expect.</p></div></div>
+              <div class="choice-grid three" data-group="bias">
+                <button type="button" class="choice bullish" data-value="Bullish"><span class="choice-icon">↗</span><span><b>Bullish</b><small>Upside bias</small></span></button>
+                <button type="button" class="choice neutral" data-value="Sideways"><span class="choice-icon">↔</span><span><b>Sideways</b><small>Range bias</small></span></button>
+                <button type="button" class="choice bearish" data-value="Bearish"><span class="choice-icon">↘</span><span><b>Bearish</b><small>Downside bias</small></span></button>
+              </div>
+            </div>
+
+            <div class="question-block">
+              <div class="question-title"><span class="step">02</span><div><h3 id="openQuestion">Expected opening?</h3><p>How do you expect Nifty to open versus the previous close?</p></div></div>
+              <div class="choice-grid three" data-group="opening">
+                <button type="button" class="choice" data-value="Gap Up"><span class="choice-icon">↑</span><span><b>Gap up</b><small>Higher open</small></span></button>
+                <button type="button" class="choice" data-value="Flat"><span class="choice-icon">—</span><span><b>Flat</b><small>Near previous close</small></span></button>
+                <button type="button" class="choice" data-value="Gap Down"><span class="choice-icon">↓</span><span><b>Gap down</b><small>Lower open</small></span></button>
+              </div>
+            </div>
+
+            <div class="question-block">
+              <div class="question-title"><span class="step">03</span><div><h3 id="dayQuestion">Expected day type?</h3><p>Describe the structure you expect after the open.</p></div></div>
+              <div class="choice-grid three" data-group="dayType">
+                <button type="button" class="choice" data-value="Trend"><span class="choice-icon">↗</span><span><b>Trend</b><small>Directional session</small></span></button>
+                <button type="button" class="choice" data-value="Range"><span class="choice-icon">↔</span><span><b>Range</b><small>Rotational session</small></span></button>
+                <button type="button" class="choice" data-value="Reversal"><span class="choice-icon">⤴</span><span><b>Reversal</b><small>Direction changes</small></span></button>
+              </div>
+            </div>
+
+            <div class="question-block last-question">
+              <div class="question-title"><span class="step">04</span><div><h3 id="levelsQuestion">Key levels</h3><p>Mark the levels that would matter most to your thesis.</p></div></div>
+              <div class="input-grid">
+                <label><span id="supportLabel">Support</span><div class="input-wrap"><span>S</span><input id="support" inputmode="decimal" type="number" step="0.05" placeholder="e.g. 25180" /></div></label>
+                <label><span id="resistanceLabel">Resistance</span><div class="input-wrap"><span>R</span><input id="resistance" inputmode="decimal" type="number" step="0.05" placeholder="e.g. 25420" /></div></label>
+              </div>
+            </div>
+
+            <div class="form-footer">
+              <div class="lock-copy"><span>◆</span><p id="lockFineprint">Once locked, today's prediction cannot be edited.</p></div>
+              <button id="lockBtn" class="primary-btn compact-btn" type="submit">LOCK MY VIEW <span>→</span></button>
+            </div>
+          </form>
+        </section>
+
+        <section id="result" class="view">
+          <div class="page-heading"><div><span class="section-kicker">SESSION REVIEW</span><h1>Prediction score</h1><p class="muted">Compare your locked view with the actual market outcome.</p></div></div>
+          <div id="scorePanel" class="score-card hidden">
+            <div class="score-ring"><span id="scoreValue">0</span><small>/100</small></div>
+            <div id="scoreInsight" class="score-insight"></div>
+            <div id="scoreBreakdown" class="score-breakdown"></div>
           </div>
-          <div class="profile-stats">
-            <div><b id="profilePredictions">0</b><small>Predictions</small></div>
-            <div><b id="profileScored">0</b><small>Scored</small></div>
-            <div><b id="profileBest">—</b><small>Best score</small></div>
+          <form id="actualForm" class="panel form-card">
+            <div class="panel-head"><div><span class="section-kicker">ACTUAL OUTCOME</span><h2>What happened today?</h2></div></div>
+            <div class="form-grid">
+              <label class="select-label"><span>Direction</span><select id="actualBias"><option>Bullish</option><option>Sideways</option><option>Bearish</option></select></label>
+              <label class="select-label"><span>Opening</span><select id="actualOpening"><option>Gap Up</option><option>Flat</option><option>Gap Down</option></select></label>
+              <label class="select-label"><span>Day type</span><select id="actualDayType"><option>Trend</option><option>Range</option><option>Reversal</option></select></label>
+            </div>
+            <div class="input-grid">
+              <label><span>Actual low</span><div class="input-wrap"><span>L</span><input id="actualLow" inputmode="decimal" type="number" step="0.05" /></div></label>
+              <label><span>Actual high</span><div class="input-wrap"><span>H</span><input id="actualHigh" inputmode="decimal" type="number" step="0.05" /></div></label>
+            </div>
+            <button class="primary-btn" type="submit">CALCULATE SCORE <span>→</span></button>
+          </form>
+        </section>
+
+        <section id="history" class="view">
+          <div class="page-heading"><div><span class="section-kicker">HISTORY</span><h1>Your market-reading record</h1><p class="muted">Review your forward tests without hindsight.</p></div></div>
+          <div class="filter-row panel">
+            <button class="filter-chip active" data-history-filter="all">All</button>
+            <button class="filter-chip" data-history-filter="7">Last 7</button>
+            <button class="filter-chip" data-history-filter="30">Last 30</button>
+            <button class="filter-chip" data-history-filter="scored">Scored</button>
           </div>
-        </div>
-        <form id="profileForm" class="card form-card">
-          <h3>Edit profile</h3>
-          <label class="field-label"><span>Display name</span><input id="editName" required /></label>
-          <label class="field-label"><span>Email</span><input id="editEmail" type="email" required /></label>
-          <button class="primary-btn" type="submit">SAVE PROFILE</button>
-        </form>
-        <button id="signOutBtn" class="danger-btn" type="button">SIGN OUT / SWITCH PROFILE</button>
-        <p class="fineprint">This test profile is local to this browser. Cloud login and cross-device history will come with the production backend.</p>
-      </section>
-    </main>
+          <div id="historySummary" class="history-summary"></div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+
+        <section id="score" class="view">
+          <div class="page-heading"><div><span class="section-kicker">PERFORMANCE</span><h1>Market Reading Score</h1><p class="muted">See what you read well and where your process needs work.</p></div></div>
+          <div class="profile-score panel"><div><span class="big-score" id="avgScore">—</span><small>/100</small></div><p id="profileSessions">No scored sessions yet</p></div>
+          <div id="skillBars" class="panel"></div>
+        </section>
+
+        <section id="profile" class="view">
+          <div class="page-heading"><div><span class="section-kicker">ACCOUNT</span><h1 id="profileNameHeading">Your profile</h1><p class="muted">Manage your identity and local forward-test record.</p></div></div>
+          <div class="panel profile-card">
+            <div class="profile-identity"><div class="profile-avatar" id="profileAvatar">U</div><div><h2 id="profileDisplayName">User</h2><p id="profileEmail" class="muted"></p></div></div>
+            <div class="profile-stats"><div><b id="profilePredictions">0</b><small>Predictions</small></div><div><b id="profileScored">0</b><small>Scored</small></div><div><b id="profileBest">—</b><small>Best score</small></div></div>
+          </div>
+          <form id="profileForm" class="panel form-card">
+            <div class="panel-head"><div><span class="section-kicker">DETAILS</span><h2>Edit profile</h2></div></div>
+            <label class="field-label"><span>Display name</span><input id="editName" required /></label>
+            <label class="field-label"><span>Email</span><input id="editEmail" type="email" required /></label>
+            <button class="primary-btn" type="submit">SAVE PROFILE</button>
+          </form>
+          <button id="signOutBtn" class="danger-btn" type="button">SIGN OUT / SWITCH PROFILE</button>
+          <p class="fineprint">This beta profile is local to this browser. Cloud authentication comes with the production backend.</p>
+        </section>
+      </main>
+    </div>
 
     <nav class="bottom-nav" aria-label="Primary">
-      <button class="nav-item active" data-target="today"><span>⌂</span><small id="navToday">Today</small></button>
-      <button class="nav-item" data-target="result"><span>✓</span><small id="navResult">Result</small></button>
-      <button class="nav-item" data-target="history"><span>◷</span><small id="navHistory">History</small></button>
-      <button class="nav-item" data-target="score"><span>◎</span><small id="navScore">My Score</small></button>
+      <button class="nav-item active" data-target="today"><svg viewBox="0 0 24 24"><path d="M4 12.5 12 5l8 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg><small id="navToday">Today</small></button>
+      <button class="nav-item" data-target="result"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><small id="navResult">Result</small></button>
+      <button class="nav-item" data-target="history"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg><small id="navHistory">History</small></button>
+      <button class="nav-item" data-target="score"><svg viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/></svg><small id="navScore">My Score</small></button>
     </nav>
   </div>
 
   <dialog id="lockDialog">
     <div class="dialog-card">
-      <div class="dialog-icon">🔒</div>
+      <div class="dialog-icon">◆</div>
+      <span class="section-kicker">FINAL CHECK</span>
       <h3 id="dialogTitle">Lock today's view?</h3>
       <p id="dialogText">After locking, you cannot change this prediction.</p>
-      <div class="dialog-actions">
-        <button id="cancelLock" class="ghost-btn" type="button">Cancel</button>
-        <button id="confirmLock" class="primary-btn" type="button">LOCK IT</button>
-      </div>
+      <div class="dialog-actions"><button id="cancelLock" class="secondary-btn" type="button">Cancel</button><button id="confirmLock" class="primary-btn" type="button">LOCK IT</button></div>
     </div>
   </dialog>
 
-  <script src="app.js?v=2.1"></script>
+  <script src="app.js?v=2.2"></script>
 </body>
 </html>
