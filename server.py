@@ -274,7 +274,6 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.end_headers if False else None
         super().end_headers()
 
 
