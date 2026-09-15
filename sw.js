@@ -1,12 +1,13 @@
-const CACHE = 'market-forward-test-v2-3';
+const CACHE = 'market-forward-test-v2-4';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=2.2',
   './theme.css?v=2.3',
+  './brand.css?v=2.4',
   './app.js?v=2.3',
-  './manifest.webmanifest?v=2.3',
-  './icon.svg?v=2.3'
+  './manifest.webmanifest?v=2.4',
+  './icon.svg?v=2.4'
 ];
 
 self.addEventListener('install', event => {
