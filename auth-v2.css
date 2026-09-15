@@ -1,0 +1,45 @@
+/* Passwordless authentication UI — V2.7 */
+.auth-mode-tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px;margin:22px 0 4px;
+  border:1px solid var(--border-soft);border-radius:14px;background:var(--field)
+}
+.auth-mode-tab{
+  min-height:40px;border:0;border-radius:10px;background:transparent;color:var(--muted);
+  font-size:10px;font-weight:850;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:7px
+}
+.auth-mode-tab.active{background:var(--primary-soft);color:var(--primary-strong);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 18%,transparent)}
+.auth-mode-tab svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.auth-panel{display:none}.auth-panel.active{display:block}
+.phone-field{display:grid;grid-template-columns:92px 1fr;gap:8px}
+.phone-field select,.phone-field input{min-height:48px;border:1px solid var(--border);background:var(--field);color:var(--text);border-radius:13px;padding:0 12px;outline:none}
+.phone-field select:focus,.phone-field input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.auth-helper{display:flex;align-items:flex-start;gap:8px;margin:12px 0 0;color:var(--muted);font-size:9px;line-height:1.55}
+.auth-helper-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex:0 0 auto;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.auth-status{margin:13px 0 0;padding:10px 12px;border:1px solid var(--border-soft);border-radius:11px;background:color-mix(in srgb,var(--surface-2) 58%,transparent);font-size:9px;line-height:1.55;color:var(--muted)}
+.auth-status.ready{border-color:color-mix(in srgb,var(--accent) 24%,var(--border));background:var(--accent-soft);color:var(--accent)}
+.auth-status.error{border-color:color-mix(in srgb,var(--rose) 28%,var(--border));background:var(--rose-soft);color:var(--rose)}
+.auth-status.success{border-color:color-mix(in srgb,var(--teal) 28%,var(--border));background:var(--teal-soft);color:var(--teal)}
+.otp-stage{margin-top:22px;padding-top:20px;border-top:1px solid var(--border-soft)}
+.otp-stage h3{margin:0 0 5px;font-size:18px;letter-spacing:-.03em}.otp-stage p{margin:0;color:var(--muted);font-size:10px;line-height:1.55}
+.otp-code{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin:17px 0 12px}
+.otp-code input{min-width:0;width:100%;height:48px;text-align:center;border:1px solid var(--border);border-radius:11px;background:var(--field);color:var(--text);font-size:19px;font-weight:850;outline:none}
+.otp-code input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.otp-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}.otp-actions button{font-size:9px}
+.auth-back-btn{border:0;background:transparent;color:var(--muted);font-weight:800;padding:8px 0}.auth-back-btn:hover{color:var(--text)}
+.auth-security-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border-soft)}
+.auth-security-row span{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:8px}.auth-security-row b{color:var(--text-2);font-size:8px}
+.auth-security-icon{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.auth-local-only .auth-mode-tabs{opacity:.82}
+.auth-local-only [data-auth-method="phone"]{opacity:.48}
+.auth-local-only .auth-status{display:block}
+.auth-live .existing-profiles{display:none!important}
+.auth-live .saved-label{display:none!important}
+.auth-live .auth-card:before{content:"SECURE PASSWORDLESS SIGN-IN"}
+.auth-live .auth-card .fineprint{display:none}
+.auth-live #authNameRow{display:none}
+.auth-local-only #authNameRow{display:flex}
+.auth-identity-note{margin-top:12px;color:var(--muted);font-size:9px;line-height:1.5}
+
+@media(max-width:620px){
+  .auth-mode-tabs{margin-top:18px}.phone-field{grid-template-columns:84px 1fr}.otp-code{gap:5px}.otp-code input{height:44px;font-size:17px}.auth-security-row{align-items:flex-start;flex-direction:column}
+}
