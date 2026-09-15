@@ -108,3 +108,51 @@
 .section-kicker,.product-kicker{color:var(--primary-strong)}
 .future-dot,.status-dot,.live-dot{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 .choice.neutral .choice-icon{color:var(--accent);background:var(--accent-soft)}
+
+/* Directional theme reveal */
+:root.theme-switching *,
+:root.theme-switching *::before,
+:root.theme-switching *::after{
+  transition:none!important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root){
+  animation:none;
+  mix-blend-mode:normal;
+}
+::view-transition-old(root){z-index:1}
+::view-transition-new(root){z-index:9999}
+
+:root[data-theme-transition="light"]::view-transition-new(root){
+  clip-path:polygon(0 0,0 0,0 0);
+  animation:mft-reveal-light 760ms cubic-bezier(.76,0,.24,1) forwards;
+}
+:root[data-theme-transition="dark"]::view-transition-new(root){
+  clip-path:polygon(100% 0,100% 0,100% 0);
+  animation:mft-reveal-dark 760ms cubic-bezier(.76,0,.24,1) forwards;
+}
+
+@keyframes mft-reveal-light{
+  to{clip-path:polygon(0 0,200% 0,0 200%)}
+}
+@keyframes mft-reveal-dark{
+  to{clip-path:polygon(-100% 0,100% 0,100% 200%)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  ::view-transition-old(root),
+  ::view-transition-new(root){animation:none!important}
+}
+
+/* Mobile safe-area support */
+@media(max-width:900px){
+  .bottom-nav{
+    left:max(12px,env(safe-area-inset-left));
+    right:max(12px,env(safe-area-inset-right));
+    bottom:max(12px,env(safe-area-inset-bottom));
+  }
+  .workspace-content{
+    padding-bottom:calc(92px + env(safe-area-inset-bottom));
+  }
+}
