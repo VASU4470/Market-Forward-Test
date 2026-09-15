@@ -1,4 +1,4 @@
-const CACHE = 'market-forward-test-v2-5';
+const CACHE = 'market-forward-test-v2-6';
 const ASSETS = [
   './',
   './index.html',
@@ -33,6 +33,22 @@ self.addEventListener('fetch', event => {
           return response;
         })
         .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  const isAppAsset = ['style', 'script'].includes(event.request.destination);
+  if (isAppAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
