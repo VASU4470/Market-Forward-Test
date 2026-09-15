@@ -145,6 +145,139 @@
   ::view-transition-new(root){animation:none!important}
 }
 
+/* Professional account surfaces */
+.auth-card-wrap{background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 40%,transparent),transparent)}
+.auth-card{
+  position:relative;
+  padding:34px;
+  border:1px solid var(--border-soft);
+  border-radius:24px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 96%,transparent),color-mix(in srgb,var(--panel-end) 98%,transparent));
+  box-shadow:var(--shadow-md),inset 0 1px 0 color-mix(in srgb,var(--text) 5%,transparent);
+}
+.auth-card:before{
+  content:"PERSONAL WORKSPACE  ·  BETA";
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  margin-bottom:16px;
+  padding:0 9px;
+  border:1px solid color-mix(in srgb,var(--primary) 24%,var(--border));
+  border-radius:999px;
+  background:var(--primary-soft);
+  color:var(--primary-strong);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.12em;
+}
+.auth-card h2{font-size:32px;line-height:1.06;letter-spacing:-.045em;margin:7px 0 10px}
+.auth-card>.muted{max-width:360px;font-size:12px;line-height:1.65}
+.auth-card form{margin-top:24px;padding-top:20px;border-top:1px solid var(--border-soft)}
+.auth-card .field-label{font-size:10px;letter-spacing:.02em;margin:13px 0}
+.auth-card .field-label input{min-height:48px;padding:0 14px;border-radius:13px}
+.auth-card .primary-btn{min-height:48px;margin-top:18px;border-radius:13px;letter-spacing:.035em}
+.auth-card .fineprint{
+  margin-top:14px;
+  padding:10px 12px;
+  border:1px solid var(--border-soft);
+  border-radius:11px;
+  background:color-mix(in srgb,var(--accent-soft) 55%,transparent);
+  color:var(--muted);
+  text-align:left;
+  line-height:1.55;
+}
+.auth-card .fineprint:before{content:"●  ";color:var(--accent)}
+.saved-label{margin-top:22px;padding-top:18px;border-top:1px solid var(--border-soft);font-size:8px;letter-spacing:.14em}
+.saved-profile{
+  position:relative;
+  min-height:58px;
+  padding:10px 40px 10px 10px;
+  border-radius:13px;
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent);
+}
+.saved-profile:after{content:"→";position:absolute;right:15px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;transition:transform .15s ease,color .15s ease}
+.saved-profile:hover:after{transform:translate(3px,-50%);color:var(--primary-strong)}
+.saved-profile .mini-avatar{width:38px;height:38px;border-radius:11px}
+.saved-profile b{font-size:11px}.saved-profile small{font-size:8px;margin-top:3px}
+
+#profile .profile-card{
+  position:relative;
+  padding:26px;
+  background:
+    radial-gradient(circle at 88% 10%,var(--primary-soft),transparent 34%),
+    linear-gradient(180deg,var(--surface),var(--panel-end));
+}
+#profile .profile-card:before{
+  content:"LOCAL BETA ACCOUNT";
+  position:absolute;
+  right:20px;
+  top:18px;
+  padding:6px 9px;
+  border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));
+  border-radius:999px;
+  background:var(--accent-soft);
+  color:var(--accent);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+#profile .profile-identity{gap:16px;padding-right:130px}
+#profile .profile-avatar{width:68px;height:68px;border-radius:20px;font-size:23px;box-shadow:0 16px 34px color-mix(in srgb,var(--primary) 18%,transparent)}
+#profile .profile-identity h2{font-size:21px;letter-spacing:-.035em;margin-bottom:5px}
+#profile .profile-identity .muted{font-size:11px}
+#profile .profile-stats{margin-top:24px;gap:10px}
+#profile .profile-stats>div{padding:15px 12px;border-radius:13px;background:color-mix(in srgb,var(--field) 92%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent)}
+#profile .profile-stats b{font-size:21px;letter-spacing:-.03em}
+#profile .profile-stats small{font-size:8px;letter-spacing:.035em;text-transform:uppercase}
+
+#profileForm{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  column-gap:14px;
+  align-items:end;
+  margin-top:14px;
+  padding:24px;
+}
+#profileForm .panel-head{grid-column:1/-1;margin-bottom:8px;padding-bottom:15px;border-bottom:1px solid var(--border-soft)}
+#profileForm .field-label{margin:10px 0 0}
+#profileForm .field-label input{min-height:46px}
+#profileForm .primary-btn{grid-column:1/-1;justify-self:end;min-width:170px;margin-top:16px}
+#profileForm:after{
+  content:"Your email is currently used only to identify this local profile on this browser.";
+  grid-column:1/-1;
+  margin-top:12px;
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.55;
+}
+#profile #signOutBtn{
+  width:auto;
+  min-width:210px;
+  margin-top:2px;
+  border-color:var(--border);
+  background:transparent;
+  color:var(--text-2);
+}
+#profile #signOutBtn:hover{background:var(--surface-2);border-color:color-mix(in srgb,var(--primary) 28%,var(--border))}
+#profile>.fineprint{
+  margin-top:14px;
+  padding:13px 15px;
+  border:1px solid var(--border-soft);
+  border-radius:13px;
+  background:var(--surface);
+  text-align:left;
+  color:var(--muted);
+  line-height:1.6;
+}
+#profile>.fineprint:before{
+  content:"ACCOUNT STATUS  ·  ";
+  color:var(--accent);
+  font-weight:900;
+  letter-spacing:.09em;
+}
+.profile-pill{box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent)}
+.profile-pill .avatar-btn{box-shadow:none}
+
 /* Mobile safe-area support */
 @media(max-width:900px){
   .bottom-nav{
@@ -155,4 +288,19 @@
   .workspace-content{
     padding-bottom:calc(92px + env(safe-area-inset-bottom));
   }
+  .auth-card{padding:28px}
+}
+
+@media(max-width:620px){
+  .auth-card{padding:22px;border-radius:18px}
+  .auth-card:before{margin-top:34px}
+  .auth-card h2{font-size:27px}
+  #profile .profile-card{padding:20px}
+  #profile .profile-card:before{position:static;display:inline-flex;margin-bottom:16px}
+  #profile .profile-identity{padding-right:0}
+  #profile .profile-avatar{width:58px;height:58px;border-radius:17px}
+  #profileForm{grid-template-columns:1fr;padding:19px}
+  #profileForm .panel-head,#profileForm .primary-btn,#profileForm:after{grid-column:1}
+  #profileForm .primary-btn{width:100%;justify-self:stretch}
+  #profile #signOutBtn{width:100%}
 }
