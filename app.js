@@ -1,8 +1,34 @@
 const ROOT_KEY = 'marketForwardTestV2';
 const LEGACY_KEY = 'marketForwardTestV1';
+const THEME_KEY = 'marketForwardTestTheme';
 const INDIA_TZ = 'Asia/Kolkata';
 
 const $ = id => document.getElementById(id);
+
+function currentTheme(){
+  try { return localStorage.getItem(THEME_KEY) || document.documentElement.dataset.theme || 'dark'; }
+  catch (_) { return document.documentElement.dataset.theme || 'dark'; }
+}
+
+function applyTheme(theme){
+  const next = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', next === 'light' ? '#f5efe7' : '#100d13');
+  document.querySelectorAll('.theme-toggle').forEach(btn => {
+    const icon = btn.querySelector('.theme-toggle-icon');
+    const label = btn.querySelector('.theme-toggle-label');
+    if (icon) icon.textContent = next === 'dark' ? '☀' : '◐';
+    if (label) label.textContent = next === 'dark' ? 'Light' : 'Dark';
+    btn.setAttribute('aria-label', `Switch to ${next === 'dark' ? 'light' : 'dark'} theme`);
+    btn.setAttribute('title', `Switch to ${next === 'dark' ? 'light' : 'dark'} theme`);
+  });
+}
+
+function toggleTheme(){
+  applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+}
 
 function indiaDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -355,6 +381,9 @@ $('langToggle').onclick=()=>{
   const state=activeState(); state.language=state.language==='en'?'ta':'en'; saveRoot(); renderAll();
 };
 
+$('themeToggle')?.addEventListener('click', toggleTheme);
+$('authThemeToggle')?.addEventListener('click', toggleTheme);
+
 function navigate(target){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.target===target));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===target));
@@ -362,6 +391,8 @@ function navigate(target){
 }
 
 document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.target)));
+
+applyTheme(currentTheme());
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
