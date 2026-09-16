@@ -1,0 +1,44 @@
+/* Account authentication UI — V3: verify, complete account, then password sign-in */
+.auth-flow-tabs,.auth-method-tabs{
+  display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px;
+  border:1px solid var(--border-soft);border-radius:14px;background:var(--field)
+}
+.auth-flow-tabs{margin:22px 0 10px}.auth-method-tabs{margin:0 0 18px}
+.auth-flow-tab,.auth-method-tab{
+  min-height:40px;border:0;border-radius:10px;background:transparent;color:var(--muted);
+  font-size:10px;font-weight:850;letter-spacing:.02em;cursor:pointer
+}
+.auth-flow-tab.active,.auth-method-tab.active{
+  background:var(--primary-soft);color:var(--primary-strong);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 18%,transparent)
+}
+.auth-v3-form{margin-top:0!important;padding-top:0!important;border-top:0!important}
+.auth-v3-form .field-label{display:block;margin:12px 0}
+.auth-v3-form input,.auth-v3-form select{
+  width:100%;min-height:48px;padding:0 14px;border:1px solid var(--border);border-radius:13px;
+  background:var(--field);color:var(--text);outline:none;font:inherit;box-sizing:border-box
+}
+.auth-v3-form input:focus,.auth-v3-form select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.auth-v3-form .primary-btn{width:100%;justify-content:center}
+.phone-field{display:grid;grid-template-columns:94px 1fr;gap:8px}.phone-field select{padding:0 9px}
+.auth-status-v3{margin:13px 0 0;padding:10px 12px;border:1px solid var(--border-soft);border-radius:11px;background:color-mix(in srgb,var(--surface-2) 58%,transparent);font-size:9px;line-height:1.55;color:var(--muted)}
+.auth-status-v3.ready{border-color:color-mix(in srgb,var(--accent) 24%,var(--border));background:var(--accent-soft);color:var(--accent)}
+.auth-status-v3.error{border-color:color-mix(in srgb,var(--rose) 28%,var(--border));background:var(--rose-soft);color:var(--rose)}
+.auth-status-v3.success{border-color:color-mix(in srgb,var(--teal) 28%,var(--border));background:var(--teal-soft);color:var(--teal)}
+.auth-helper-v3{margin-top:10px;color:var(--muted);font-size:9px;line-height:1.55}
+.auth-helper-v3 strong{color:var(--text-2)}
+.otp-stage-v3,.complete-stage-v3{margin-top:20px;padding-top:18px;border-top:1px solid var(--border-soft)}
+.otp-stage-v3 h3,.complete-stage-v3 h3{margin:4px 0 5px;font-size:19px;letter-spacing:-.03em}
+.otp-stage-v3 p,.complete-stage-v3 p{margin:0 0 14px;color:var(--muted);font-size:10px;line-height:1.55}
+.otp-code-v3{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin:16px 0 12px}
+.otp-code-v3 input{min-width:0;width:100%;height:48px;text-align:center;border:1px solid var(--border);border-radius:11px;background:var(--field);color:var(--text);font-size:19px;font-weight:850;outline:none;box-sizing:border-box}
+.otp-code-v3 input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.auth-inline-actions{display:flex;justify-content:space-between;gap:10px;margin-top:9px}.auth-text-btn{border:0;background:transparent;color:var(--muted);font-size:9px;font-weight:800;padding:8px 0;cursor:pointer}.auth-text-btn:hover{color:var(--text)}
+.password-wrap{position:relative}.password-wrap input{padding-right:55px}.password-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);font-size:8px;font-weight:850;cursor:pointer}
+.password-rules{margin:7px 0 0;color:var(--muted);font-size:8px;line-height:1.5}
+.account-created{padding:14px;border:1px solid color-mix(in srgb,var(--teal) 30%,var(--border));border-radius:13px;background:var(--teal-soft);color:var(--teal);font-size:10px;line-height:1.55}
+.auth-live-v3 .existing-profiles,.auth-live-v3 .saved-label,.auth-live-v3 .fineprint{display:none!important}
+.auth-live-v3 .auth-card:before{content:"SECURE ACCOUNT ACCESS"}
+.auth-live-v3 .auth-card form{margin-top:0;padding-top:0;border-top:0}
+.auth-busy{opacity:.65;pointer-events:none}
+@media(max-width:620px){.phone-field{grid-template-columns:84px 1fr}.otp-code-v3{gap:5px}.otp-code-v3 input{height:44px;font-size:17px}.auth-inline-actions{align-items:flex-start;flex-direction:column}}
