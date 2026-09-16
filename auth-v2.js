@@ -161,7 +161,7 @@
     submit.textContent = 'SENDING CODE…';
     try {
       const payload = method === 'email'
-        ? { email: identifier, options: { shouldCreateUser: true } }
+        ? { email: identifier, options: { shouldCreateUser: true, emailRedirectTo: window.location.origin } }
         : { phone: identifier, options: { shouldCreateUser: true } };
       const { error } = await client.auth.signInWithOtp(payload);
       if (error) throw error;
@@ -260,7 +260,9 @@
   document.getElementById('resendOtpBtn')?.addEventListener('click', async () => {
     if (!pendingIdentifier || !configured || sending) return;
     const id = pendingIdentifier;
-    const payload = method === 'email' ? { email: id } : { phone: id };
+    const payload = method === 'email'
+      ? { email: id, options: { emailRedirectTo: window.location.origin } }
+      : { phone: id };
     try {
       const { error } = await client.auth.signInWithOtp(payload);
       if (error) throw error;
