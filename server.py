@@ -253,13 +253,13 @@ class Handler(SimpleHTTPRequestHandler):
                 "</head>",
                 f'<script>window.MFT_AUTH_CONFIG={auth_config};</script>'
                 '<link rel="stylesheet" href="auto-score.css?v=1">'
-                '<link rel="stylesheet" href="auth-v2.css?v=1"></head>',
+                '<link rel="stylesheet" href="auth-v3.css?v=1"></head>',
             )
             html = html.replace(
                 "</body>",
                 '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>'
                 '<script src="auto-score.js?v=1"></script>'
-                '<script src="auth-v2.js?v=1"></script></body>',
+                '<script src="auth-v3.js?v=1"></script></body>',
             )
             body = html.encode("utf-8")
             self.send_response(200)
@@ -283,9 +283,9 @@ if __name__ == "__main__":
     auth_state = "configured" if (os.getenv("SUPABASE_URL") and (os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("SUPABASE_ANON_KEY"))) else "NOT configured"
     print(f"Market Forward Test server: http://localhost:{port}")
     print(f"Upstox analytics token: {token_state}")
-    print(f"Supabase OTP auth: {auth_state}")
+    print(f"Supabase account auth: {auth_state}")
     if token_state != "configured":
         print("Tip: export UPSTOX_ANALYTICS_TOKEN='your_token' for automatic scoring.")
     if auth_state != "configured":
-        print("Tip: export SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to activate secure OTP sign-in.")
+        print("Tip: export SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to activate secure account authentication.")
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
