@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: market-forward-test
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: python3 server.py
+    healthCheckPath: /
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: UPSTOX_ANALYTICS_TOKEN
+        sync: false
