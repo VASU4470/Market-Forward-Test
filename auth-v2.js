@@ -1,19 +1,48 @@
 (() => {
   const cfg = window.MFT_AUTH_CONFIG || {};
   const authScreen = document.getElementById('authScreen');
+  const appShell = document.getElementById('appShell');
   const form = document.getElementById('authForm');
   const card = document.querySelector('.auth-card');
   if (!authScreen || !form || !card) return;
 
   const configured = Boolean(
-    cfg.supabaseUrl &&
-    cfg.supabasePublishableKey &&
-    window.supabase &&
-    typeof window.supabase.createClient === 'function'
+    cfg.supabaseUrl && cfg.supabasePublishableKey &&
+    window.supabase && typeof window.supabase.createClient === 'function'
   );
-  const client = configured
-    ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey)
-    : null;
+
+  const FLOW_VERSION = 'otp-only-v2';
+
+  // Remove any old magic-link tokens from the URL before Supabase can consume them.
+  if (window.location.hash && /(?:access_token|refresh_token|type=signup|type=magiclink)/i.test(window.location.hash)) {
+    history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+  }
+
+  // One-time beta migration: clear sessions created by the earlier magic-link flow.
+  if (configured) {
+    try {
+      if (localStorage.getItem('mftAuthFlowVersion') !== FLOW_VERSION) {
+        const projectRef = new URL(cfg.supabaseUrl).hostname.split('.')[0];
+        if (projectRef) localStorage.removeItem(`sb-${projectRef}-auth-token`);
+        const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{"profiles":{},"activeProfile":null}');
+        store.activeProfile = null;
+        localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
+        localStorage.setItem('mftAuthFlowVersion', FLOW_VERSION);
+      }
+    } catch (_) {}
+  }
+
+  const client = configured ? window.supabase.createClient(
+    cfg.supabaseUrl,
+    cfg.supabasePublishableKey,
+    {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false
+      }
+    }
+  ) : null;
 
   let method = 'email';
   let pendingIdentifier = '';
@@ -25,7 +54,13 @@
   const emailInput = document.getElementById('authEmail');
   const nameRow = nameInput?.closest('label');
   const emailRow = emailInput?.closest('label');
-  if (nameRow) nameRow.id = 'authNameRow';
+  if (nameRow) {
+    nameRow.id = 'authNameRow';
+    if (configured) nameRow.classList.add('hidden');
+  }
+
+  const existingProfiles = document.getElementById('existingProfiles');
+  if (configured && existingProfiles) existingProfiles.classList.add('hidden');
 
   const tabs = document.createElement('div');
   tabs.className = 'auth-mode-tabs';
@@ -61,30 +96,18 @@
         <input id="authPhone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="98765 43210" />
       </div>
     </label>
-    <div class="auth-helper"><span class="auth-helper-dot"></span><span>We use your number only for authentication. Standard SMS charges may apply.</span></div>`;
+    <div class="auth-helper"><span class="auth-helper-dot"></span><span>Your number is used only for authentication. SMS delivery requires the configured provider.</span></div>`;
   form.insertBefore(phonePanel, form.querySelector('.primary-btn'));
 
   const submit = form.querySelector('.primary-btn');
-  const submitLabel = () => {
-    if (!submit) return;
-    if (!configured) {
-      submit.innerHTML = method === 'email' ? 'CONTINUE IN LOCAL BETA <span>→</span>' : 'CONNECT AUTH BACKEND <span>→</span>';
-      return;
-    }
-    submit.innerHTML = `SEND ${method === 'email' ? 'EMAIL' : 'SMS'} CODE <span>→</span>`;
-  };
-
   const status = document.createElement('div');
   status.className = `auth-status ${configured ? 'ready' : ''}`;
-  status.textContent = configured
-    ? 'Secure passwordless authentication is connected. We will send a one-time verification code.'
-    : 'OTP authentication UI is ready. Connect Supabase to activate email and mobile verification.';
   form.after(status);
 
   const security = document.createElement('div');
   security.className = 'auth-security-row';
   security.innerHTML = `
-    <span><span class="auth-security-icon">◇</span><span>Passwordless sign-in</span></span>
+    <span><span class="auth-security-icon">◇</span><span>Passwordless OTP sign-in</span></span>
     <b>${configured ? 'AUTH CONNECTED' : 'LOCAL BETA MODE'}</b>`;
   status.after(security);
 
@@ -100,7 +123,7 @@
       </div>
       <button class="primary-btn" id="verifyOtpBtn" type="submit">VERIFY & SIGN IN <span>→</span></button>
       <div class="otp-actions">
-        <button class="auth-back-btn" id="otpBackBtn" type="button">← Change ${method === 'email' ? 'email' : 'number'}</button>
+        <button class="auth-back-btn" id="otpBackBtn" type="button">← Change email</button>
         <button class="auth-back-btn" id="resendOtpBtn" type="button">Resend code</button>
       </div>
     </form>`;
@@ -111,6 +134,24 @@
     status.textContent = message;
   }
 
+  function submitLabel() {
+    if (!submit) return;
+    if (!configured) {
+      submit.innerHTML = method === 'email' ? 'CONTINUE IN LOCAL BETA <span>→</span>' : 'CONNECT AUTH BACKEND <span>→</span>';
+    } else {
+      submit.innerHTML = `SEND ${method === 'email' ? 'EMAIL' : 'SMS'} CODE <span>→</span>`;
+    }
+  }
+
+  function defaultStatus() {
+    setStatus(
+      configured
+        ? 'Enter your email or mobile number. You must verify the one-time code before the workspace opens.'
+        : 'OTP authentication is not configured yet. Local beta sign-in remains available.',
+      configured ? 'ready' : ''
+    );
+  }
+
   function setMethod(next) {
     method = next === 'phone' ? 'phone' : 'email';
     tabs.querySelectorAll('[data-auth-method]').forEach(btn => {
@@ -118,14 +159,15 @@
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-selected', String(active));
     });
-    document.querySelectorAll('[data-auth-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.authPanel === method));
+    document.querySelectorAll('[data-auth-panel]').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.authPanel === method);
+    });
     if (emailInput) {
       emailInput.disabled = method !== 'email';
-      emailInput.required = method === 'email' && !configured;
+      emailInput.required = method === 'email';
     }
     const phone = document.getElementById('authPhone');
     if (phone) phone.required = method === 'phone';
-    if (nameInput) nameInput.required = !configured && method === 'email';
     submitLabel();
     const back = document.getElementById('otpBackBtn');
     if (back) back.textContent = `← Change ${method === 'email' ? 'email' : 'number'}`;
@@ -133,26 +175,27 @@
 
   tabs.addEventListener('click', e => {
     const btn = e.target.closest('[data-auth-method]');
-    if (!btn) return;
-    setMethod(btn.dataset.authMethod);
+    if (btn) setMethod(btn.dataset.authMethod);
   });
 
   function phoneIdentifier() {
     const code = document.getElementById('authCountryCode')?.value || '+91';
-    const raw = document.getElementById('authPhone')?.value || '';
-    const digits = raw.replace(/\D/g, '');
+    const digits = (document.getElementById('authPhone')?.value || '').replace(/\D/g, '');
     return `${code}${digits}`;
   }
 
   async function requestOtp() {
     if (!configured || sending) return;
-    const identifier = method === 'email' ? (emailInput?.value || '').trim().toLowerCase() : phoneIdentifier();
+    const identifier = method === 'email'
+      ? (emailInput?.value || '').trim().toLowerCase()
+      : phoneIdentifier();
+
     if (method === 'email' && !/^\S+@\S+\.\S+$/.test(identifier)) {
       setStatus('Enter a valid email address.', 'error');
       return;
     }
     if (method === 'phone' && identifier.replace(/\D/g, '').length < 10) {
-      setStatus('Enter a valid mobile number including the correct country code.', 'error');
+      setStatus('Enter a valid mobile number including the country code.', 'error');
       return;
     }
 
@@ -161,7 +204,7 @@
     submit.textContent = 'SENDING CODE…';
     try {
       const payload = method === 'email'
-        ? { email: identifier, options: { shouldCreateUser: true, emailRedirectTo: window.location.origin } }
+        ? { email: identifier, options: { shouldCreateUser: true } }
         : { phone: identifier, options: { shouldCreateUser: true } };
       const { error } = await client.auth.signInWithOtp(payload);
       if (error) throw error;
@@ -170,10 +213,10 @@
       tabs.classList.add('hidden');
       otpStage.classList.remove('hidden');
       document.getElementById('otpDestination').textContent = `Code sent to ${identifier}. Enter it below to continue.`;
-      setStatus('Verification code sent. It may take a few seconds to arrive.', 'success');
+      setStatus('Verification code requested. If no numeric code arrives, the Supabase email/SMS template is not configured for OTP yet.', 'success');
       otpStage.querySelector('[data-otp-index="0"]')?.focus();
     } catch (err) {
-      setStatus(err?.message || 'Unable to send the verification code. Check the authentication configuration.', 'error');
+      setStatus(err?.message || 'Unable to send the verification code.', 'error');
     } finally {
       sending = false;
       submit.disabled = false;
@@ -181,49 +224,49 @@
     }
   }
 
-  document.addEventListener('submit', async e => {
-    if (e.target === form) {
-      if (configured) {
+  form.addEventListener('submit', async e => {
+    if (!configured) {
+      if (method === 'phone') {
         e.preventDefault();
         e.stopImmediatePropagation();
-        await requestOtp();
-      } else if (method === 'phone') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setStatus('Mobile OTP needs Supabase plus an SMS provider. Email local-beta sign-in remains available until that is connected.', 'error');
+        setStatus('Mobile OTP requires Supabase and an SMS provider.', 'error');
       }
       return;
     }
-
-    if (e.target.id === 'otpForm') {
-      e.preventDefault();
-      if (!configured || !pendingIdentifier) return;
-      const token = [...otpStage.querySelectorAll('[data-otp-index]')].map(input => input.value).join('');
-      if (!/^\d{6}$/.test(token)) {
-        setStatus('Enter the complete 6-digit verification code.', 'error');
-        return;
-      }
-      const verifyBtn = document.getElementById('verifyOtpBtn');
-      verifyBtn.disabled = true;
-      verifyBtn.textContent = 'VERIFYING…';
-      try {
-        const params = method === 'email'
-          ? { email: pendingIdentifier, token, type: 'email' }
-          : { phone: pendingIdentifier, token, type: 'sms' };
-        const { data, error } = await client.auth.verifyOtp(params);
-        if (error) throw error;
-        const user = data.user || data.session?.user;
-        if (!user) throw new Error('Authentication succeeded but no user session was returned.');
-        mirrorAuthenticatedUser(user);
-        setStatus('Identity verified. Opening your workspace…', 'success');
-        window.location.reload();
-      } catch (err) {
-        setStatus(err?.message || 'The code could not be verified. Try again.', 'error');
-        verifyBtn.disabled = false;
-        verifyBtn.innerHTML = 'VERIFY & SIGN IN <span>→</span>';
-      }
-    }
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    await requestOtp();
   }, true);
+
+  document.getElementById('otpForm')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!configured || !pendingIdentifier) return;
+    const token = [...otpStage.querySelectorAll('[data-otp-index]')].map(input => input.value).join('');
+    if (!/^\d{6}$/.test(token)) {
+      setStatus('Enter the complete 6-digit verification code.', 'error');
+      return;
+    }
+
+    const verifyBtn = document.getElementById('verifyOtpBtn');
+    verifyBtn.disabled = true;
+    verifyBtn.textContent = 'VERIFYING…';
+    try {
+      const params = method === 'email'
+        ? { email: pendingIdentifier, token, type: 'email' }
+        : { phone: pendingIdentifier, token, type: 'sms' };
+      const { data, error } = await client.auth.verifyOtp(params);
+      if (error) throw error;
+      const user = data.user || data.session?.user;
+      if (!user || !data.session) throw new Error('OTP verification did not create a valid session.');
+      mirrorAuthenticatedUser(user);
+      setStatus('Identity verified. Opening your workspace…', 'success');
+      window.location.reload();
+    } catch (err) {
+      setStatus(err?.message || 'The code could not be verified. Request a new code and try again.', 'error');
+      verifyBtn.disabled = false;
+      verifyBtn.innerHTML = 'VERIFY & SIGN IN <span>→</span>';
+    }
+  });
 
   function mirrorAuthenticatedUser(user) {
     const key = user.email || user.phone || user.id;
@@ -248,25 +291,22 @@
   }
 
   function resetOtp() {
+    pendingIdentifier = '';
+    otpStage.querySelectorAll('[data-otp-index]').forEach(input => input.value = '');
     otpStage.classList.add('hidden');
     tabs.classList.remove('hidden');
     form.classList.remove('hidden');
-    pendingIdentifier = '';
-    otpStage.querySelectorAll('[data-otp-index]').forEach(input => input.value = '');
-    setStatus(configured ? 'Secure passwordless authentication is connected. We will send a one-time verification code.' : 'OTP authentication UI is ready. Connect Supabase to activate email and mobile verification.', configured ? 'ready' : '');
+    defaultStatus();
   }
 
   document.getElementById('otpBackBtn')?.addEventListener('click', resetOtp);
   document.getElementById('resendOtpBtn')?.addEventListener('click', async () => {
-    if (!pendingIdentifier || !configured || sending) return;
-    const id = pendingIdentifier;
-    const payload = method === 'email'
-      ? { email: id, options: { emailRedirectTo: window.location.origin } }
-      : { phone: id };
+    if (!configured || !pendingIdentifier || sending) return;
     try {
+      const payload = method === 'email' ? { email: pendingIdentifier } : { phone: pendingIdentifier };
       const { error } = await client.auth.signInWithOtp(payload);
       if (error) throw error;
-      setStatus('A new verification code was sent.', 'success');
+      setStatus('A new verification code was requested.', 'success');
     } catch (err) {
       setStatus(err?.message || 'Unable to resend the code yet.', 'error');
     }
@@ -290,41 +330,60 @@
     });
   });
 
-  document.getElementById('signOutBtn')?.addEventListener('click', () => {
-    if (configured) client.auth.signOut().catch(() => {});
+  document.getElementById('signOutBtn')?.addEventListener('click', async e => {
+    if (!configured) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    try { await client.auth.signOut({ scope: 'local' }); } catch (_) {}
+    try {
+      const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{"profiles":{},"activeProfile":null}');
+      store.activeProfile = null;
+      localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
+    } catch (_) {}
+    window.location.reload();
   }, true);
 
   async function enforceSecureSession() {
-    if (!configured) return;
+    if (!configured) {
+      defaultStatus();
+      return;
+    }
     try {
-      const { data } = await client.auth.getSession();
+      const { data, error } = await client.auth.getSession();
+      if (error) throw error;
       const session = data?.session;
-      const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{"profiles":{},"activeProfile":null}');
       if (session?.user) {
-        const key = String(session.user.email || session.user.phone || session.user.id).toLowerCase();
-        if (!store.profiles?.[key] || store.activeProfile !== key) {
-          mirrorAuthenticatedUser(session.user);
-          window.location.reload();
-          return;
-        }
-        const profile = store.profiles[key];
-        const identityText = profile.email || profile.phone || '';
+        mirrorAuthenticatedUser(session.user);
+        const identity = session.user.email || session.user.phone || '';
         const profileEmail = document.getElementById('profileEmail');
-        if (profileEmail && identityText) profileEmail.textContent = identityText;
+        const editEmail = document.getElementById('editEmail');
+        if (profileEmail && identity) profileEmail.textContent = identity;
+        if (editEmail) {
+          editEmail.value = session.user.email || '';
+          editEmail.readOnly = true;
+          editEmail.title = 'Authentication email is managed by your verified account.';
+        }
+        authScreen.classList.add('hidden');
+        appShell?.classList.remove('hidden');
         return;
       }
 
-      if (store.activeProfile) {
+      try {
+        const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{"profiles":{},"activeProfile":null}');
         store.activeProfile = null;
         localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
-      }
-      document.getElementById('authScreen')?.classList.remove('hidden');
-      document.getElementById('appShell')?.classList.add('hidden');
+      } catch (_) {}
+      authScreen.classList.remove('hidden');
+      appShell?.classList.add('hidden');
+      defaultStatus();
     } catch (_) {
+      authScreen.classList.remove('hidden');
+      appShell?.classList.add('hidden');
       setStatus('Authentication service is temporarily unavailable. Please try again.', 'error');
     }
   }
 
   setMethod('email');
+  defaultStatus();
   enforceSecureSession();
 })();
