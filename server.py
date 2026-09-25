@@ -252,8 +252,9 @@ class Handler(SimpleHTTPRequestHandler):
             html = html.replace(
                 "</head>",
                 f'<script>window.MFT_AUTH_CONFIG={auth_config};</script>'
-                '<link rel="stylesheet" href="auto-score.css?v=1">'
-                '<link rel="stylesheet" href="auth-v3.css?v=1"></head>',
+                '<link rel="stylesheet" href="auto-score.css?v=2.8">'
+                '<link rel="stylesheet" href="auth-v3.css?v=2.8">'
+                '<link rel="stylesheet" href="accessibility.css?v=1"></head>',
             )
             html = html.replace(
                 "</body>",

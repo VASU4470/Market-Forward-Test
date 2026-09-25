@@ -1,4 +1,4 @@
-# Market Forward Test V2.7
+# PiZero — UI update V2.8
 
 A mobile-first PWA prototype for Indian market traders.
 
@@ -9,6 +9,13 @@ A mobile-first PWA prototype for Indian market traders.
 4. After the market closes, fetch the completed Nifty session automatically.
 5. Generate an objective score.
 6. Review personal history and skill profile.
+
+## Display preferences
+- PiZero logo on sign-in, desktop sidebar and mobile header, plus a matching browser/app icon.
+- A− / percentage / A+ controls on sign-in and in the workspace header.
+- Text size: 100–150% in 10% steps; the percentage button resets to the 110% default.
+- Preference stays on this browser across reloads and sign-in/sign-out, and syncs between tabs.
+- Relative font sizes preserve native browser zoom; compact captions now have a 12px base minimum.
 
 ## Current features
 - Professional account/login UI

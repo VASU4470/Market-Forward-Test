@@ -1,12 +1,12 @@
 {
-  "name": "Market Forward Test",
-  "short_name": "MFT",
+  "name": "PiZero",
+  "short_name": "PiZero",
   "description": "Predict. Lock. Score. Improve.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#120f17",
   "theme_color": "#120f17",
   "icons": [
-    {"src":"icon.svg?v=2.4","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {"src":"icon.svg?v=2.8","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
   ]
 }

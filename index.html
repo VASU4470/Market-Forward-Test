@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#120f17" />
-  <meta name="description" content="Market Forward Test — Predict. Lock. Score. Improve." />
+  <meta name="description" content="PiZero — Predict. Lock. Score. Improve." />
+  <script src="text-size.js?v=1"></script>
   <script>
     try {
       const savedTheme = localStorage.getItem('marketForwardTestTheme');
@@ -13,20 +14,22 @@
       document.documentElement.dataset.theme = 'dark';
     }
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=2.4" />
-  <link rel="icon" href="icon.svg?v=2.4" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=2.2" />
-  <link rel="stylesheet" href="theme.css?v=2.3" />
-  <link rel="stylesheet" href="brand.css?v=2.4" />
-  <title>Market Forward Test</title>
+  <link rel="manifest" href="manifest.webmanifest?v=2.8" />
+  <link rel="icon" href="icon.svg?v=2.8" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css?v=2.8" />
+  <link rel="stylesheet" href="theme.css?v=2.8" />
+  <link rel="stylesheet" href="brand.css?v=2.8" />
+  <link rel="stylesheet" href="accessibility.css?v=1" />
+  <title>PiZero · Forward Test</title>
 </head>
 <body>
+  <div id="textSizeAnnouncement" class="visually-hidden" role="status" aria-live="polite"></div>
   <section id="authScreen" class="auth-screen">
     <div class="auth-layout">
       <div class="auth-brand-panel">
         <div class="brand-lockup large-lockup">
-          <div class="brand-symbol">M</div>
-          <div><strong>Market Forward Test</strong><span>Decision intelligence for Indian markets</span></div>
+          <img class="pizero-logo" src="pizero-logo.png" alt="PiZero" width="2172" height="724" />
+          <div><strong class="brand-name">PiZero</strong><span>Decision intelligence for Indian markets</span></div>
         </div>
         <div class="auth-message">
           <span class="product-kicker">BUILD A VERIFIED TRACK RECORD</span>
@@ -41,10 +44,17 @@
       </div>
 
       <div class="auth-card-wrap">
+        <div class="auth-display-controls"><div class="text-size-control" role="group" aria-label="Text size">
+            <span class="text-size-label">Text</span>
+            <button type="button" data-text-size="decrease" aria-label="Decrease text size" title="Decrease text size">A−</button>
+            <button type="button" data-text-size="reset" aria-label="Reset text size to 110 percent" title="Reset text size to 110%"><span data-text-size-value>110%</span></button>
+            <button type="button" data-text-size="increase" aria-label="Increase text size" title="Increase text size">A+</button>
+          </div>
         <button id="authThemeToggle" class="theme-toggle auth-theme-toggle" type="button" aria-label="Switch theme"><span class="theme-toggle-icon">☀</span><span class="theme-toggle-label">Light</span></button>
+        </div>
         <div class="auth-card">
           <div class="mobile-auth-brand">
-            <div class="brand-symbol">M</div><strong>Market Forward Test</strong>
+            <img class="pizero-logo" src="pizero-logo.png" alt="PiZero" width="2172" height="724" /><strong class="brand-name">PiZero</strong>
           </div>
           <span class="section-kicker">WELCOME</span>
           <h2>Your market record starts here.</h2>
@@ -64,8 +74,8 @@
   <div id="appShell" class="platform-shell hidden">
     <aside class="sidebar">
       <div class="brand-lockup">
-        <div class="brand-symbol">M</div>
-        <div><strong>Market Forward Test</strong><span>India · Beta</span></div>
+        <img class="pizero-logo" src="pizero-logo.png" alt="PiZero" width="2172" height="724" />
+        <div><strong class="brand-name">PiZero</strong><span>India · Beta</span></div>
       </div>
 
       <div class="sidebar-section">
@@ -101,14 +111,20 @@
     <div class="workspace-shell">
       <header class="topbar">
         <div class="mobile-brand">
-          <div class="brand-symbol small">M</div>
-          <div><strong>Market Forward Test</strong><span>India · Beta</span></div>
+          <img class="pizero-logo" src="pizero-logo.png" alt="PiZero" width="2172" height="724" />
+          <div><strong class="brand-name">PiZero</strong><span>India · Beta</span></div>
         </div>
         <div class="topbar-context">
           <span class="context-label">MARKET WORKSPACE</span>
           <strong>Forward Test</strong>
         </div>
         <div class="top-actions">
+          <div class="text-size-control" role="group" aria-label="Text size">
+            <span class="text-size-label">Text</span>
+            <button type="button" data-text-size="decrease" aria-label="Decrease text size" title="Decrease text size">A−</button>
+            <button type="button" data-text-size="reset" aria-label="Reset text size to 110 percent" title="Reset text size to 110%"><span data-text-size-value>110%</span></button>
+            <button type="button" data-text-size="increase" aria-label="Increase text size" title="Increase text size">A+</button>
+          </div>
           <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch theme"><span class="theme-toggle-icon">☀</span><span class="theme-toggle-label">Light</span></button>
           <button id="langToggle" class="utility-btn" type="button">தமிழ்</button>
           <button id="profileButton" class="profile-pill" type="button" aria-label="Open profile">

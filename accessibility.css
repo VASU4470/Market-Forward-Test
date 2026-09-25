@@ -1,0 +1,67 @@
+/* Relative typography works with both PiZero text controls and browser zoom. */
+html { font-size: 110%; }
+body { line-height: 1.5; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.text-size-control { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text-2); flex-shrink: 0; }
+.text-size-label { padding: 0 6px; font-size: .75rem; }
+.text-size-control button { min-width: 40px; min-height: 40px; padding: 5px 7px; border: 0; border-radius: 8px; background: transparent; color: inherit; font-size: .8125rem; font-weight: 800; }
+.text-size-control button:hover:not(:disabled) { background: var(--primary-soft); color: var(--primary-strong); }
+.text-size-control button:disabled { opacity: .35; cursor: default; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--primary-strong); outline-offset: 3px; }
+.topbar { height: auto; min-height: 74px; padding-top: 10px; padding-bottom: 10px; gap: 12px; flex-wrap: wrap; }
+.top-actions { flex-wrap: wrap; justify-content: flex-end; }
+.auth-card-wrap { display: flex; flex-direction: column; justify-content: center; gap: 20px; min-width: 0; }
+.auth-display-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; width: 100%; }
+.auth-display-controls .auth-theme-toggle { position: static; }
+.auth-card { flex-shrink: 0; }
+.auth-card:before { margin-top: 0; }
+.pizero-logo { display: block; width: 100%; height: auto; background: #fffdf9; border-radius: 10px; }
+.brand-name { display: none; }
+.brand-lockup, .mobile-brand, .mobile-auth-brand { flex-direction: column; align-items: flex-start; gap: 7px; }
+.brand-lockup .pizero-logo { max-width: 200px; }
+.large-lockup .pizero-logo { max-width: 260px; }
+.mobile-brand .pizero-logo { width: 126px; }
+.mobile-brand > div { display: none; }
+.mobile-auth-brand .pizero-logo { width: 180px; }
+.sidebar { overflow-y: auto; }
+.sidebar .nav-item svg, .choice-icon { flex-shrink: 0; }
+.choice-icon { min-width: 34px; }
+.choice, .choice > span:last-child, .question-title > div, .profile-identity > div { min-width: 0; }
+.choice small, .question-title p { line-height: 1.5; }
+.choice b { font-size: .9375rem; }
+.input-wrap input, .select-label select, .field-label input, .field-label select, .auth-v3-form .field-label input, .auth-v3-form .field-label select { font-size: 1rem; min-width: 0; }
+.input-wrap > span { flex: 0 0 38px; }
+.panel-head, .auto-score-head, .auto-score-actions, .form-footer { flex-wrap: wrap; }
+.choice-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.history-item, .history-summary, .profile-identity { gap: 12px; flex-wrap: wrap; }
+.history-item .meta, .profile-identity p, .saved-profile small { overflow-wrap: anywhere; }
+.profile-stats > div, .metric { min-width: 0; overflow-wrap: anywhere; }
+.phone-field { grid-template-columns: minmax(100px, .6fr) minmax(0, 1fr); }
+.password-wrap input { padding-right: 5rem; }
+.otp-code-v3 input { height: auto; min-height: 48px; padding: 8px 0; }
+.auto-market-grid { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+@media (max-width: 1100px) {
+  .topbar-context { display: none; }
+  .top-actions { margin-left: auto; }
+  .auth-brand-panel { padding: 32px; }
+  .auth-card-wrap { padding: 28px; }
+}
+@media (max-width: 900px) {
+  .workspace-content { padding-bottom: calc(130px + env(safe-area-inset-bottom)); }
+  .auth-card-wrap { padding: 24px; }
+}
+@media (max-width: 620px) {
+  .topbar { align-items: center; }
+  .top-actions { gap: 6px; }
+  .top-actions .text-size-control { order: 4; flex-basis: 100%; justify-content: center; }
+  .top-actions { flex: 1 1 170px; }
+  .mobile-brand { align-self: flex-start; padding-top: 4px; }
+  .text-size-label { display: none; }
+  .choice-grid.three { grid-template-columns: 1fr; }
+  .auth-card-wrap { padding: 16px; }
+  .auth-card { padding: 20px; }
+  .auth-card h2 { font-size: 1.5rem; line-height: 1.2; }
+  .phone-field { grid-template-columns: minmax(0, 1fr); }
+  .bottom-nav .nav-item { min-width: 0; }
+  .bottom-nav small { font-size: .6875rem; overflow-wrap: anywhere; }
+}

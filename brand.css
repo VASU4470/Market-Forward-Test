@@ -166,14 +166,14 @@
   border-radius:999px;
   background:var(--primary-soft);
   color:var(--primary-strong);
-  font-size:8px;
+  font-size:0.75rem;
   font-weight:900;
   letter-spacing:.12em;
 }
-.auth-card h2{font-size:32px;line-height:1.06;letter-spacing:-.045em;margin:7px 0 10px}
-.auth-card>.muted{max-width:360px;font-size:12px;line-height:1.65}
+.auth-card h2{font-size:2rem;line-height:1.06;letter-spacing:-.045em;margin:7px 0 10px}
+.auth-card>.muted{max-width:360px;font-size:0.875rem;line-height:1.65}
 .auth-card form{margin-top:24px;padding-top:20px;border-top:1px solid var(--border-soft)}
-.auth-card .field-label{font-size:10px;letter-spacing:.02em;margin:13px 0}
+.auth-card .field-label{font-size:0.75rem;letter-spacing:.02em;margin:13px 0}
 .auth-card .field-label input{min-height:48px;padding:0 14px;border-radius:13px}
 .auth-card .primary-btn{min-height:48px;margin-top:18px;border-radius:13px;letter-spacing:.035em}
 .auth-card .fineprint{
@@ -187,7 +187,7 @@
   line-height:1.55;
 }
 .auth-card .fineprint:before{content:"●  ";color:var(--accent)}
-.saved-label{margin-top:22px;padding-top:18px;border-top:1px solid var(--border-soft);font-size:8px;letter-spacing:.14em}
+.saved-label{margin-top:22px;padding-top:18px;border-top:1px solid var(--border-soft);font-size:0.75rem;letter-spacing:.14em}
 .saved-profile{
   position:relative;
   min-height:58px;
@@ -195,10 +195,10 @@
   border-radius:13px;
   box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent);
 }
-.saved-profile:after{content:"→";position:absolute;right:15px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;transition:transform .15s ease,color .15s ease}
+.saved-profile:after{content:"→";position:absolute;right:15px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:1rem;transition:transform .15s ease,color .15s ease}
 .saved-profile:hover:after{transform:translate(3px,-50%);color:var(--primary-strong)}
 .saved-profile .mini-avatar{width:38px;height:38px;border-radius:11px}
-.saved-profile b{font-size:11px}.saved-profile small{font-size:8px;margin-top:3px}
+.saved-profile b{font-size:0.75rem}.saved-profile small{font-size:0.75rem;margin-top:3px}
 
 #profile .profile-card{
   position:relative;
@@ -217,18 +217,18 @@
   border-radius:999px;
   background:var(--accent-soft);
   color:var(--accent);
-  font-size:8px;
+  font-size:0.75rem;
   font-weight:900;
   letter-spacing:.1em;
 }
 #profile .profile-identity{gap:16px;padding-right:130px}
-#profile .profile-avatar{width:68px;height:68px;border-radius:20px;font-size:23px;box-shadow:0 16px 34px color-mix(in srgb,var(--primary) 18%,transparent)}
-#profile .profile-identity h2{font-size:21px;letter-spacing:-.035em;margin-bottom:5px}
-#profile .profile-identity .muted{font-size:11px}
+#profile .profile-avatar{width:68px;height:68px;border-radius:20px;font-size:1.4375rem;box-shadow:0 16px 34px color-mix(in srgb,var(--primary) 18%,transparent)}
+#profile .profile-identity h2{font-size:1.3125rem;letter-spacing:-.035em;margin-bottom:5px}
+#profile .profile-identity .muted{font-size:0.75rem}
 #profile .profile-stats{margin-top:24px;gap:10px}
 #profile .profile-stats>div{padding:15px 12px;border-radius:13px;background:color-mix(in srgb,var(--field) 92%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent)}
-#profile .profile-stats b{font-size:21px;letter-spacing:-.03em}
-#profile .profile-stats small{font-size:8px;letter-spacing:.035em;text-transform:uppercase}
+#profile .profile-stats b{font-size:1.3125rem;letter-spacing:-.03em}
+#profile .profile-stats small{font-size:0.75rem;letter-spacing:.035em;text-transform:uppercase}
 
 #profileForm{
   display:grid;
@@ -247,7 +247,7 @@
   grid-column:1/-1;
   margin-top:12px;
   color:var(--muted);
-  font-size:9px;
+  font-size:0.75rem;
   line-height:1.55;
 }
 #profile #signOutBtn{
@@ -294,7 +294,7 @@
 @media(max-width:620px){
   .auth-card{padding:22px;border-radius:18px}
   .auth-card:before{margin-top:34px}
-  .auth-card h2{font-size:27px}
+  .auth-card h2{font-size:1.6875rem}
   #profile .profile-card{padding:20px}
   #profile .profile-card:before{position:static;display:inline-flex;margin-bottom:16px}
   #profile .profile-identity{padding-right:0}
