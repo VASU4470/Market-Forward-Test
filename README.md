@@ -36,6 +36,10 @@ SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
 
 Use only a browser-safe publishable/anon key, never the service-role key. In Supabase Authentication, enable Email and set the Site URL and allowed Redirect URLs to the exact deployed origin (including `https://`). Confirm that the email template contains a working confirmation link and that password reset emails are enabled. A frontend push cannot set these dashboard values. Production fails closed with a configuration error when Supabase is absent; localhost retains the local prototype for development.
 
+## Local profile onboarding preview
+
+To repeatedly inspect the signup/profile screens without creating users or sending email, run `python3 server.py` and open `http://localhost:8080/?dev-test=1`. This local-only preview simulates a verified email, validates the personal details, shows the adaptive trading/investing questions, and lets you restart. It never calls Supabase and does not save a profile or password. The preview is disabled on the Render domain.
+
 ## Automatic scoring pilot
 The automatic-scoring development server uses Upstox Historical Data V3 and keeps the market-data credential on the server side. The browser never receives the token.
 

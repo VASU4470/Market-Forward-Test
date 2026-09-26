@@ -1,4 +1,4 @@
-const CACHE = 'market-forward-test-v2-10';
+const CACHE = 'market-forward-test-v2-11';
 const ASSETS = [
   './',
   './index.html',
@@ -11,7 +11,7 @@ const ASSETS = [
   './pizero-logo.png',
   './app.js?v=2.3',
   './auth-v3.js?v=2',
-  './auth-v4.js?v=3',
+  './auth-v4.js?v=4',
   './auto-score.css?v=2.8',
   './auto-score.js?v=1',
   './manifest.webmanifest?v=2.8',

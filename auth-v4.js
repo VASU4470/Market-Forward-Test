@@ -5,6 +5,82 @@
   const card = document.querySelector('.auth-card');
   const oldForm = document.getElementById('authForm');
   if (!authScreen || !appShell || !card || !oldForm) return;
+  const localDevTest = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).get('dev-test') === '1';
+  if (localDevTest) {
+    authScreen.classList.remove('hidden');
+    appShell.classList.add('hidden');
+    authScreen.classList.add('auth-live-v3');
+    const previewForm = oldForm.cloneNode(false);
+    previewForm.id = 'authForm';
+    previewForm.className = 'auth-v3-form';
+    oldForm.replaceWith(previewForm);
+    document.getElementById('existingProfiles')?.remove();
+    const heading = card.querySelector('h2');
+    const description = card.querySelector('p.muted');
+    const status = document.createElement('div');
+    status.className = 'auth-status-v3 ready';
+    status.setAttribute('role','status');
+    status.setAttribute('aria-live','polite');
+    previewForm.after(status);
+    let step = 'start';
+    let person = {};
+    const e = value => String(value || '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    const select = (id,label,items) => `<label class="field-label"><span>${label}</span><select id="${id}">${items.map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select></label>`;
+    const checks = (name,label,items) => `<fieldset class="onboarding-choices"><legend>${label}</legend>${items.map(([v,t])=>`<label><input type="checkbox" name="${name}" value="${v}"><span>${t}</span></label>`).join('')}</fieldset>`;
+    const selected = name => [...previewForm.querySelectorAll(`input[name="${name}"]:checked`)].map(x=>x.value);
+    const say = (message,kind='ready') => { status.className=`auth-status-v3 ${kind}`; status.textContent=message; };
+    function begin(){
+      step='personal'; heading.textContent='Profile test · Personal details';
+      description.textContent='Local preview only. Use a test password; nothing is sent or saved.';
+      previewForm.innerHTML=`<div class="kyc-note"><strong>Simulated email verified</strong><p>test-user@pizero.local · This does not send email or create an account.</p></div><label class="field-label"><span>Display name *</span><input id="devName" maxlength="80" autocomplete="name"></label><label class="field-label"><span>Mobile number (optional)</span><input id="devMobile" type="tel" placeholder="+91 98765 43210"></label><p class="auth-helper-v3">Mobile verification is part of KYC — coming soon.</p>${select('devLanguage','Preferred language',[['en','English'],['ta','தமிழ்']])}<label class="field-label"><span>Test password</span><input id="devPassword" type="password" autocomplete="off" placeholder="Any 8 characters; not stored"></label><label class="field-label"><span>Confirm test password</span><input id="devConfirm" type="password" autocomplete="off"></label><button class="primary-btn" type="submit">CONTINUE <span>→</span></button>`;
+      say('Developer test mode: local browser only. No Supabase calls are made.');
+    }
+    function trading(){
+      step='trading'; heading.textContent='Profile test · Market profile';
+      description.textContent='Step 2 of 2 · Explore optional trading and investing choices.';
+      previewForm.innerHTML=`${select('devExperience','Market experience',[['','Choose'],['under_6m','Less than 6 months'],['6m_1y','6 months–1 year'],['1_3y','1–3 years'],['3_5y','3–5 years'],['5y_plus','5+ years']])}${select('devCapital','Approximate trading / investment capital',[['','Prefer not to say'],['under_50k','Below ₹50,000'],['50k_1l','₹50,000–₹1 lakh'],['1_5l','₹1–5 lakh'],['5_10l','₹5–10 lakh'],['10_25l','₹10–25 lakh'],['25l_plus','Above ₹25 lakh']])}${checks('devRoles','I am interested in',[['intraday','Intraday trading'],['swing','Swing / short-term trading'],['positional','Positional trading'],['options','Options trading'],['futures','Futures trading'],['investing','Investing']])}<div id="devOptions" class="conditional-profile hidden">${checks('devMarkets','Options markets',[['nifty','NIFTY'],['banknifty','BANK NIFTY'],['finnifty','FINNIFTY'],['midcpnifty','MIDCPNIFTY'],['sensex','SENSEX'],['bankex','BANKEX'],['stock_options','Stock options']])}${select('devOptionStyle','Options style',[['','Choose'],['buying','Option buying'],['selling','Option selling'],['both','Both']])}</div><div id="devInvesting" class="conditional-profile hidden">${select('devHorizon','Investment horizon',[['','Choose'],['under_1y','Under 1 year'],['1_3y','1–3 years'],['3_5y','3–5 years'],['5y_plus','5+ years']])}${checks('devAssets','Investment instruments',[['stocks','Stocks'],['etfs','ETFs'],['mutual_funds','Mutual funds'],['index_funds','Index funds'],['bonds','Bonds'],['gold','Gold'],['other','Other']])}</div>${select('devBroker','Current broker',[['','Prefer not to say'],['zerodha','Zerodha'],['dhan','Dhan'],['upstox','Upstox'],['angel_one','Angel One'],['groww','Groww'],['icici_direct','ICICI Direct'],['hdfc','HDFC Securities'],['kotak','Kotak'],['other','Other'],['none','No broker yet']])}<div class="kyc-note"><strong>KYC verification — Coming soon</strong><p>Mobile and PAN verification will be available later. PAN is not collected.</p></div><div class="auth-inline-actions"><button type="button" class="auth-text-btn" data-dev-back>← Back</button></div><button class="primary-btn" type="submit">PREVIEW COMPLETION <span>→</span></button>`;
+      say('Select Options or Investing to reveal those extra profile questions.');
+    }
+    function complete(){
+      const roles=selected('devRoles');
+      const summary={...person,experience:previewForm.querySelector('#devExperience').value,capital_range:previewForm.querySelector('#devCapital').value,roles,option_markets:roles.includes('options')?selected('devMarkets'):[],option_style:roles.includes('options')?previewForm.querySelector('#devOptionStyle').value:'',investment_horizon:roles.includes('investing')?previewForm.querySelector('#devHorizon').value:'',investment_assets:roles.includes('investing')?selected('devAssets'):[],broker:previewForm.querySelector('#devBroker').value};
+      step='done'; heading.textContent='Profile preview complete';
+      description.textContent='This was a local preview; no account or profile was created.';
+      previewForm.innerHTML=`<div class="account-summary"><h3>Details entered</h3><p>Name: ${e(summary.name)} · Email: test-user@pizero.local</p><p>Mobile: ${e(summary.mobile||'Not provided')} · Language: ${e(summary.language)}</p><p>Experience: ${e(summary.experience||'Not selected')} · Capital: ${e(summary.capital_range||'Not selected')}</p><p>Interests: ${e(summary.roles.join(', ')||'None selected')}</p><p>Options: ${e(summary.option_markets.join(', ')||'Not selected')} · Style: ${e(summary.option_style||'Not selected')}</p><p>Investments: ${e(summary.investment_assets.join(', ')||'Not selected')} · Horizon: ${e(summary.investment_horizon||'Not selected')}</p><p>Broker: ${e(summary.broker||'Not selected')}</p></div><button class="primary-btn" type="button" data-dev-restart>RESTART PROFILE TEST</button>`;
+      say('Preview finished. Restart any time; nothing was saved.', 'success');
+    }
+    previewForm.addEventListener('click',event=>{
+      if(event.target.closest('[data-dev-restart]')) begin();
+      if(event.target.closest('[data-dev-back]')) { step='personal'; begin(); }
+    });
+    previewForm.addEventListener('change',event=>{
+      if(event.target.name!=='devRoles') return;
+      const roles=selected('devRoles');
+      document.getElementById('devOptions')?.classList.toggle('hidden',!roles.includes('options'));
+      document.getElementById('devInvesting')?.classList.toggle('hidden',!roles.includes('investing'));
+    });
+    previewForm.addEventListener('submit',event=>{
+      event.preventDefault();
+      if(step==='start'){begin();return;}
+      if(step==='personal'){
+        const name=previewForm.querySelector('#devName').value.trim();
+        const mobile=previewForm.querySelector('#devMobile').value.trim().replace(/[\s()-]/g,'');
+        const password=previewForm.querySelector('#devPassword').value;
+        if(name.length<2){say('Enter a display name of at least 2 characters.','error');return;}
+        if(mobile&&!/^\+[1-9]\d{7,14}$/.test(mobile)){say('Use a country code, for example +91 98765 43210.','error');return;}
+        if(password.length<8){say('Use at least 8 characters for the test password.','error');return;}
+        if(password!==previewForm.querySelector('#devConfirm').value){say('The test passwords do not match.','error');return;}
+        person={name,mobile,language:previewForm.querySelector('#devLanguage').value};
+        trading();return;
+      }
+      if(step==='trading') complete();
+    });
+    heading.textContent='Developer profile test';
+    description.textContent='Run the profile creation screens locally without creating an email or Supabase user.';
+    previewForm.innerHTML='<div class="kyc-note"><strong>Local only</strong><p>This mode is available only on localhost. It simulates verified email and does not send or save your data.</p></div><button class="primary-btn" type="submit">START PROFILE TEST <span>→</span></button>';
+    say('Open this page on localhost with ?dev-test=1 to start.');
+    return;
+  }
   if (!cfg.supabaseUrl || !cfg.supabasePublishableKey || !window.supabase?.createClient) {
     if (!['localhost','127.0.0.1'].includes(location.hostname)) {
       authScreen.classList.remove('hidden'); appShell.classList.add('hidden');
