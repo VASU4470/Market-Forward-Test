@@ -49,4 +49,6 @@
 .kyc-note,.account-summary{border:1px solid var(--border-soft);border-radius:13px;padding:12px;margin:16px 0;color:var(--text-2);font-size:.8rem}
 .kyc-note p,.account-summary p{margin:6px 0 0;color:var(--muted)}
 .account-summary h3{margin:0}
+.supabase-live #profile .profile-card:before{content:"VERIFIED EMAIL ACCOUNT"}
+.supabase-live #profileForm:after{content:"Account details sync across devices. Prediction history remains in this browser."}
 @media(max-width:620px){.phone-field{grid-template-columns:84px 1fr}.otp-code-v3{gap:5px}.otp-code-v3 input{height:44px;font-size:1.0625rem}.auth-inline-actions{align-items:flex-start;flex-direction:column}}

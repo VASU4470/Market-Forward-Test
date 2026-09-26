@@ -29,6 +29,7 @@
   const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   });
+  document.body.classList.add('supabase-live');
   authScreen.classList.add('auth-live-v3');
   const title = card.querySelector('h2');
   const subtitle = card.querySelector('p.muted');
@@ -83,6 +84,8 @@
     const details = meta.onboarding || {};
     const profileForm = document.getElementById('profileForm');
     if (!profileForm) return;
+    const note = document.querySelector('#profile > .fineprint');
+    if (note) note.textContent = 'Your account details are saved with Supabase. Prediction history is stored in this browser for now.';
     // Replace the local prototype's edit form: its email edit only changes browser storage.
     const safeForm = profileForm.cloneNode(false);
     profileForm.replaceWith(safeForm);
