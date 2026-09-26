@@ -41,4 +41,12 @@
 .auth-live-v3 .auth-card:before{content:"SECURE ACCOUNT ACCESS"}
 .auth-live-v3 .auth-card form{margin-top:0;padding-top:0;border-top:0}
 .auth-busy{opacity:.65;pointer-events:none}
+.onboarding-choices{border:1px solid var(--border-soft);border-radius:13px;padding:12px;margin:16px 0}
+.onboarding-choices legend{padding:0 5px;color:var(--text-2);font-size:.8rem;font-weight:800}
+.onboarding-choices label{display:flex;align-items:center;gap:10px;min-height:36px;font-size:.82rem;color:var(--text)}
+.auth-v3-form .onboarding-choices input{width:18px;min-height:18px;height:18px;flex:none;accent-color:var(--primary)}
+.conditional-profile{border-left:2px solid var(--border);padding-left:12px;margin:12px 0}
+.kyc-note,.account-summary{border:1px solid var(--border-soft);border-radius:13px;padding:12px;margin:16px 0;color:var(--text-2);font-size:.8rem}
+.kyc-note p,.account-summary p{margin:6px 0 0;color:var(--muted)}
+.account-summary h3{margin:0}
 @media(max-width:620px){.phone-field{grid-template-columns:84px 1fr}.otp-code-v3{gap:5px}.otp-code-v3 input{height:44px;font-size:1.0625rem}.auth-inline-actions{align-items:flex-start;flex-direction:column}}

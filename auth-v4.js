@@ -5,325 +5,284 @@
   const card = document.querySelector('.auth-card');
   const oldForm = document.getElementById('authForm');
   if (!authScreen || !appShell || !card || !oldForm) return;
+  if (!cfg.supabaseUrl || !cfg.supabasePublishableKey || !window.supabase?.createClient) {
+    if (!['localhost','127.0.0.1'].includes(location.hostname)) {
+      authScreen.classList.remove('hidden'); appShell.classList.add('hidden');
+      oldForm.replaceWith(Object.assign(document.createElement('p'), {
+        className:'auth-status-v3 error',
+        textContent:'Sign in is temporarily unavailable. The site administrator must configure Supabase authentication on the server.'
+      }));
+      document.getElementById('existingProfiles')?.remove();
+    }
+    return;
+  }
 
-  const configured = Boolean(
-    cfg.supabaseUrl && cfg.supabasePublishableKey && window.supabase &&
-    typeof window.supabase.createClient === 'function'
-  );
-  if (!configured) return;
-
-  // Replace prototype form/button nodes so legacy local-auth listeners cannot fire.
   const form = oldForm.cloneNode(false);
   form.id = 'authForm';
   form.className = 'auth-v3-form';
-  form.setAttribute('novalidate', '');
+  form.noValidate = true;
   oldForm.replaceWith(form);
-
   const oldSignOut = document.getElementById('signOutBtn');
-  let signOutBtn = null;
-  if (oldSignOut) {
-    signOutBtn = oldSignOut.cloneNode(true);
-    oldSignOut.replaceWith(signOutBtn);
-  }
+  const signOutBtn = oldSignOut?.cloneNode(true);
+  if (signOutBtn) oldSignOut.replaceWith(signOutBtn);
 
   const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   });
-
   authScreen.classList.add('auth-live-v3');
   const title = card.querySelector('h2');
   const subtitle = card.querySelector('p.muted');
   const existingProfiles = document.getElementById('existingProfiles');
   if (existingProfiles) existingProfiles.innerHTML = '';
-
-  let flow = 'signin';
-  let method = 'email';
-  let pendingIdentifier = '';
-  let busy = false;
-
-  const flowTabs = document.createElement('div');
-  flowTabs.className = 'auth-flow-tabs';
-  flowTabs.innerHTML = '<button class="auth-flow-tab active" type="button" data-flow="signin">SIGN IN</button><button class="auth-flow-tab" type="button" data-flow="signup">SIGN UP</button>';
-
-  const methodTabs = document.createElement('div');
-  methodTabs.className = 'auth-method-tabs';
-  methodTabs.innerHTML = '<button class="auth-method-tab active" type="button" data-method="email">Email</button><button class="auth-method-tab" type="button" data-method="phone">Mobile</button>';
-
+  const tabs = document.createElement('div');
+  tabs.className = 'auth-flow-tabs';
+  tabs.innerHTML = '<button class="auth-flow-tab active" type="button" data-flow="signin">SIGN IN</button><button class="auth-flow-tab" type="button" data-flow="signup">SIGN UP</button>';
   const status = document.createElement('div');
   status.className = 'auth-status-v3 ready';
-  form.before(flowTabs, methodTabs);
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  form.before(tabs);
   form.after(status);
 
-  function esc(value = '') {
-    return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-  }
-  function setStatus(message, state = 'ready') {
-    status.className = `auth-status-v3 ${state}`;
-    status.textContent = message;
-  }
-  function setBusy(next) {
-    busy = next;
-    card.classList.toggle('auth-busy', next);
-  }
-  function phoneField() {
-    return '<label class="field-label"><span>Mobile number</span><div class="phone-field"><select id="authV4Country" aria-label="Country code"><option value="+91" selected>🇮🇳 +91</option><option value="+1">+1</option><option value="+44">+44</option><option value="+971">+971</option><option value="+65">+65</option></select><input id="authV4Phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="98765 43210" /></div></label>';
-  }
-  function passwordField(id, label, autocomplete) {
-    return `<label class="field-label"><span>${label}</span><div class="password-wrap"><input id="${id}" type="password" autocomplete="${autocomplete}" /><button class="password-toggle" type="button" data-toggle-password="${id}">SHOW</button></div></label>`;
-  }
-  function currentIdentifier() {
-    if (method === 'email') return (document.getElementById('authV4Email')?.value || '').trim().toLowerCase();
-    const code = document.getElementById('authV4Country')?.value || '+91';
-    const digits = (document.getElementById('authV4Phone')?.value || '').replace(/\D/g, '');
-    return `${code}${digits}`;
-  }
-  function validIdentifier(value) {
-    return method === 'email' ? /^\S+@\S+\.\S+$/.test(value) : value.replace(/\D/g, '').length >= 10;
-  }
+  let flow = 'signin';
+  let stage = 'entry';
+  let busy = false;
+  let accountUser = null;
+  let basics = null;
+  const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const emailField = '<label class="field-label"><span>Email</span><input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com" /></label>';
+  const passwordField = (id, label, autocomplete) => `<label class="field-label"><span>${label}</span><div class="password-wrap"><input id="${id}" type="password" autocomplete="${autocomplete}" required /><button class="password-toggle" type="button" data-toggle-password="${id}">SHOW</button></div></label>`;
+  const value = id => (document.getElementById(id)?.value || '').trim();
+  const email = () => value('authEmail').toLowerCase();
+  const validEmail = address => /^\S+@\S+\.\S+$/.test(address);
+  function setStatus(message, kind = 'ready') { status.className = `auth-status-v3 ${kind}`; status.textContent = message; }
+  function setBusy(next) { busy = next; card.classList.toggle('auth-busy', next); }
+  function hideWorkspace() { authScreen.classList.remove('hidden'); appShell.classList.add('hidden'); }
   function clearAppProfile() {
-    try {
-      const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{"profiles":{},"activeProfile":null}');
-      store.activeProfile = null;
-      localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
-    } catch (_) {}
+    try { const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{}'); store.activeProfile = null; localStorage.setItem('marketForwardTestV2', JSON.stringify(store)); } catch (_) {}
   }
   function mirrorUser(user) {
-    const key = String(user.email || user.phone || user.id).toLowerCase();
-    const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{"profiles":{},"activeProfile":null}');
-    if (!store.profiles) store.profiles = {};
+    const key = user.email.toLowerCase();
+    const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{}');
+    store.profiles ||= {};
     const prior = store.profiles[key] || {};
-    const language = user.user_metadata?.preferred_language || prior.state?.language || 'en';
+    const meta = user.user_metadata || {};
+    const language = meta.preferred_language || prior.state?.language || 'en';
     store.profiles[key] = {
-      id:key,
-      name:user.user_metadata?.display_name || prior.name || (user.email ? user.email.split('@')[0] : 'User'),
-      email:user.email || prior.email || '',
-      phone:user.phone || prior.phone || '',
-      createdAt:prior.createdAt || user.created_at || new Date().toISOString(),
-      state:prior.state || {predictions:[],language},
-      supabaseUserId:user.id,
-      authProvider:'supabase',
-      authVerified:true
+      ...prior, id:key, name:meta.display_name || prior.name || key.split('@')[0], email:key,
+      phone:meta.mobile_number || '', createdAt:prior.createdAt || user.created_at || new Date().toISOString(),
+      state:prior.state || {predictions:[],language}, supabaseUserId:user.id,
+      authProvider:'supabase', authVerified:true, onboarding:meta.onboarding || prior.onboarding || {}
     };
     store.profiles[key].state.language = language;
     store.activeProfile = key;
     localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
   }
-
-  function renderEntry(message = '') {
-    flowTabs.classList.remove('hidden');
-    methodTabs.classList.remove('hidden');
-    form.classList.remove('hidden');
-    flowTabs.querySelectorAll('[data-flow]').forEach(b => b.classList.toggle('active', b.dataset.flow === flow));
-    methodTabs.querySelectorAll('[data-method]').forEach(b => b.classList.toggle('active', b.dataset.method === method));
-
-    if (flow === 'signin') {
-      title.textContent = 'Welcome back.';
-      subtitle.textContent = 'Sign in with your verified email address or mobile number and password.';
-      form.innerHTML = `${method === 'email' ? '<label class="field-label"><span>Email</span><input id="authV4Email" type="email" autocomplete="email" placeholder="you@example.com" /></label>' : phoneField()}${passwordField('authV4Password','Password','current-password')}<button class="primary-btn" type="submit">SIGN IN <span>→</span></button><div class="auth-helper-v3">New here? Choose <strong>Sign Up</strong> to verify your identity and create an account.</div>`;
-      setStatus(message || 'Only password sign-in opens the workspace.', message ? 'success' : 'ready');
-    } else {
-      title.textContent = 'Create your account.';
-      subtitle.textContent = 'Verify your email or mobile number first. Then create your profile and password.';
-      form.innerHTML = `${method === 'email' ? '<label class="field-label"><span>Email</span><input id="authV4Email" type="email" autocomplete="email" placeholder="you@example.com" /></label>' : phoneField()}<button class="primary-btn" type="submit">SEND VERIFICATION <span>→</span></button><div class="auth-helper-v3">Verification only confirms ownership. It does <strong>not</strong> open the Market Forward Test workspace.</div>`;
-      setStatus(message || (method === 'email' ? 'Your current Supabase setup may send a confirmation link. After custom SMTP is configured, it can send a 6-digit OTP instead.' : 'Mobile signup sends an SMS OTP and requires an SMS provider in Supabase.'), message ? 'success' : 'ready');
-    }
-  }
-
-  function wireOtp() {
-    const inputs = [...form.querySelectorAll('[data-otp]')];
-    inputs.forEach((input, i) => {
-      input.addEventListener('input', () => {
-        input.value = input.value.replace(/\D/g,'').slice(-1);
-        if (input.value && i < inputs.length - 1) inputs[i+1].focus();
-      });
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Backspace' && !input.value && i > 0) inputs[i-1].focus();
-      });
-      input.addEventListener('paste', e => {
-        const digits = (e.clipboardData?.getData('text') || '').replace(/\D/g,'').slice(0,6);
-        if (!digits) return;
-        e.preventDefault();
-        digits.split('').forEach((d,j) => { if (inputs[j]) inputs[j].value=d; });
-      });
+  function renderAccountProfile(user) {
+    const meta = user.user_metadata || {};
+    const details = meta.onboarding || {};
+    const profileForm = document.getElementById('profileForm');
+    if (!profileForm) return;
+    // Replace the local prototype's edit form: its email edit only changes browser storage.
+    const safeForm = profileForm.cloneNode(false);
+    profileForm.replaceWith(safeForm);
+    safeForm.innerHTML = `<div class="panel-head"><div><span class="section-kicker">ACCOUNT</span><h2>Personal information</h2></div></div>
+      <label class="field-label"><span>Display name</span><input id="accountName" maxlength="80" required value="${escapeHtml(meta.display_name || '')}" /></label>
+      <label class="field-label"><span>Verified email</span><input type="email" readonly value="${escapeHtml(user.email)}" /></label>
+      <label class="field-label"><span>Mobile (unverified)</span><input id="accountMobile" type="tel" maxlength="24" value="${escapeHtml(meta.mobile_number || '')}" placeholder="Optional, include country code" /></label>
+      <label class="field-label"><span>Preferred language</span><select id="accountLanguage"><option value="en">English</option><option value="ta">தமிழ்</option></select></label>
+      <button class="primary-btn" type="submit">SAVE PERSONAL DETAILS</button>
+      <div class="kyc-note"><strong>KYC verification — Coming soon</strong><p>Mobile and PAN verification are not available yet. PAN is not collected.</p></div>
+      <div class="account-summary"><h3>Market profile</h3><p>Interests: ${escapeHtml((details.roles || []).join(', ') || 'Not specified')}</p><p>Experience: ${escapeHtml(details.experience || 'Not specified')} · Capital range: ${escapeHtml(details.capital_range || 'Not specified')}</p><p>Broker: ${escapeHtml(details.broker || 'Not specified')}</p></div>`;
+    safeForm.querySelector('#accountLanguage').value = meta.preferred_language || 'en';
+    safeForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const name = safeForm.querySelector('#accountName').value.trim();
+      const mobile = safeForm.querySelector('#accountMobile').value.trim();
+      if (name.length < 2) { alert('Enter a display name of at least 2 characters.'); return; }
+      if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile.replace(/[\s()-]/g,''))) { alert('Include the mobile country code.'); return; }
+      const {data,error} = await client.auth.updateUser({data:{display_name:name,mobile_number:mobile,preferred_language:safeForm.querySelector('#accountLanguage').value}});
+      if (error) { alert(error.message); return; }
+      mirrorUser(data.user);
+      location.reload();
     });
-    inputs[0]?.focus();
   }
-
-  function renderVerification(identifier) {
-    pendingIdentifier = identifier;
-    flowTabs.classList.add('hidden');
-    methodTabs.classList.add('hidden');
-    title.textContent = 'Verify your identity.';
-    subtitle.textContent = method === 'email' ? 'Use the email verification you received. A 6-digit code works here; a confirmation link will return you to account setup.' : 'Enter the 6-digit code sent to your mobile number.';
-    form.innerHTML = `<div class="otp-stage-v3"><span class="section-kicker">VERIFICATION</span><h3>Enter the 6-digit code</h3><p>Sent to ${esc(identifier)}</p><div class="otp-code-v3">${Array.from({length:6},(_,i)=>`<input maxlength="1" inputmode="numeric" autocomplete="${i===0?'one-time-code':'off'}" data-otp="${i}" aria-label="Digit ${i+1}" />`).join('')}</div><button class="primary-btn" type="submit">VERIFY <span>→</span></button><div class="auth-inline-actions"><button type="button" class="auth-text-btn" id="authV4Back">← Change ${method==='email'?'email':'number'}</button><button type="button" class="auth-text-btn" id="authV4Resend">Resend verification</button></div></div>`;
-    wireOtp();
-    setStatus('Verification does not grant app access. After verification you must create a password and complete your profile.', 'ready');
+  function showEntry(message = '', kind = 'ready') {
+    stage = 'entry'; accountUser = null; basics = null;
+    tabs.classList.remove('hidden');
+    tabs.querySelectorAll('[data-flow]').forEach(button => button.classList.toggle('active', button.dataset.flow === flow));
+    title.textContent = flow === 'signin' ? 'Welcome back.' : 'Create your account.';
+    subtitle.textContent = flow === 'signin' ? 'Sign in with your email and password.' : 'Verify your email with a link, then complete your profile and password.';
+    form.innerHTML = flow === 'signin'
+      ? `${emailField}${passwordField('authPassword','Password','current-password')}<button class="primary-btn" type="submit">SIGN IN <span>→</span></button><button class="auth-text-btn" type="button" data-action="forgot">Forgot password?</button>`
+      : `${emailField}<button class="primary-btn" type="submit">SEND VERIFICATION LINK <span>→</span></button><div class="auth-helper-v3">Check your inbox for the link. If you already have an account, use Sign In or Forgot password.</div>`;
+    setStatus(message || (flow === 'signup' ? 'The verification link returns you here to finish registration.' : ''), kind);
   }
-
-  function renderComplete(user) {
-    flow = 'signup';
-    flowTabs.classList.add('hidden');
-    methodTabs.classList.add('hidden');
-    const identity = user.email || user.phone || pendingIdentifier || 'Verified identity';
-    title.textContent = 'Finish creating your account.';
-    subtitle.textContent = 'Your identity is verified. Create the details you will use for future sign-ins.';
-    form.innerHTML = `<div class="complete-stage-v3"><span class="section-kicker">ACCOUNT DETAILS</span><h3>Verified: ${esc(identity)}</h3><p>You are still not signed into the workspace. Complete registration below.</p><label class="field-label"><span>Display name</span><input id="authV4Name" autocomplete="name" placeholder="Your name" /></label><label class="field-label"><span>Preferred language</span><select id="authV4Language"><option value="en">English</option><option value="ta">தமிழ்</option></select></label>${passwordField('authV4NewPassword','Create password','new-password')}${passwordField('authV4ConfirmPassword','Confirm password','new-password')}<div class="password-rules">Use at least 8 characters. A longer passphrase is recommended.</div><button class="primary-btn" type="submit">CREATE ACCOUNT <span>→</span></button></div>`;
-    setStatus('Verified successfully. Finish registration to create your password.', 'success');
+  function showSent(address, reset = false) {
+    stage = 'sent'; tabs.classList.add('hidden');
+    title.textContent = 'Check your email.';
+    subtitle.textContent = reset ? 'Open the password reset link we sent.' : 'Open the verification link we sent to continue creating your account.';
+    form.innerHTML = `<p class="auth-helper-v3">Sent to ${escapeHtml(address)}. Check your spam folder too.</p><div class="auth-inline-actions"><button type="button" class="auth-text-btn" data-action="back">← Back to sign in</button><button type="button" class="auth-text-btn" data-action="resend">Resend link</button></div>`;
+    form.dataset.sentEmail = address;
+    form.dataset.sentReset = String(reset);
+    setStatus('For your privacy, we show the same confirmation whether or not that email is registered.', 'success');
   }
-
-  async function sendVerification(identifier) {
-    const payload = method === 'email'
-      ? {email:identifier, options:{shouldCreateUser:true, emailRedirectTo:window.location.origin}}
-      : {phone:identifier, options:{shouldCreateUser:true}};
-    const {error} = await client.auth.signInWithOtp(payload);
+  function showResetRequest() {
+    stage = 'forgot'; tabs.classList.add('hidden');
+    title.textContent = 'Reset your password.';
+    subtitle.textContent = 'Enter your account email for a reset link.';
+    form.innerHTML = `${emailField}<button class="primary-btn" type="submit">SEND RESET LINK <span>→</span></button><button type="button" class="auth-text-btn" data-action="back">← Back to sign in</button>`;
+    setStatus('If the address has an account, a reset email will arrive.', 'ready');
+  }
+  function showNewPassword() {
+    stage = 'reset'; tabs.classList.add('hidden'); hideWorkspace();
+    title.textContent = 'Choose a new password.';
+    subtitle.textContent = 'Your reset link has been verified.';
+    form.innerHTML = `${passwordField('authNewPassword','New password','new-password')}${passwordField('authConfirmPassword','Confirm password','new-password')}<button class="primary-btn" type="submit">SAVE PASSWORD <span>→</span></button>`;
+    setStatus('Use at least 8 characters.', 'ready');
+  }
+  function showBasics(user) {
+    stage = 'basics'; accountUser = user; tabs.classList.add('hidden'); hideWorkspace(); clearAppProfile();
+    title.textContent = 'Complete your profile.';
+    subtitle.textContent = 'Step 1 of 2 · Personal details and account security.';
+    form.innerHTML = `<div class="complete-stage-v3"><span class="section-kicker">EMAIL VERIFIED</span><h3>${escapeHtml(user.email)}</h3><label class="field-label"><span>Display name *</span><input id="authName" autocomplete="name" maxlength="80" required value="${escapeHtml(basics?.name || user.user_metadata?.display_name || '')}" /></label><label class="field-label"><span>Mobile number (optional)</span><input id="authMobile" type="tel" autocomplete="tel" maxlength="24" placeholder="+91 98765 43210" value="${escapeHtml(basics?.mobile || '')}" /></label><p class="auth-helper-v3">Mobile verification is part of KYC — coming soon. This number cannot be used to sign in yet.</p><label class="field-label"><span>Preferred language</span><select id="authLanguage"><option value="en">English</option><option value="ta">தமிழ்</option></select></label>${passwordField('authNewPassword','Create password','new-password')}${passwordField('authConfirmPassword','Confirm password','new-password')}<div class="password-rules">Use at least 8 characters.</div><button class="primary-btn" type="submit">CONTINUE <span>→</span></button></div>`;
+    document.getElementById('authLanguage').value = basics?.language || user.user_metadata?.preferred_language || 'en';
+    setStatus('Your email is verified. Finish both steps before signing in.', 'success');
+  }
+  const select = (id, label, options) => `<label class="field-label"><span>${label}</span><select id="${id}">${options.map(([key,text])=>`<option value="${key}">${text}</option>`).join('')}</select></label>`;
+  const choices = (id, label, options) => `<fieldset class="onboarding-choices"><legend>${label}</legend>${options.map(([key,text])=>`<label><input type="checkbox" name="${id}" value="${key}" /><span>${text}</span></label>`).join('')}</fieldset>`;
+  function showTrading() {
+    stage = 'trading'; title.textContent = 'Your market profile.';
+    subtitle.textContent = 'Step 2 of 2 · Choose what applies to you. You can change this later.';
+    form.innerHTML = `<div class="complete-stage-v3">${select('authExperience','Market experience', [['','Choose an option'],['under_6m','Less than 6 months'],['6m_1y','6 months–1 year'],['1_3y','1–3 years'],['3_5y','3–5 years'],['5y_plus','5+ years']])}${select('authCapital','Approximate trading / investment capital', [['','Prefer not to say'],['under_50k','Below ₹50,000'],['50k_1l','₹50,000–₹1 lakh'],['1_5l','₹1–5 lakh'],['5_10l','₹5–10 lakh'],['10_25l','₹10–25 lakh'],['25l_plus','Above ₹25 lakh']])}${choices('marketRoles','I am interested in', [['intraday','Intraday trading'],['swing','Swing / short-term trading'],['positional','Positional trading'],['options','Options trading'],['futures','Futures trading'],['investing','Investing']])}<div id="optionsDetail" class="conditional-profile hidden">${choices('optionMarkets','Options markets', [['nifty','NIFTY'],['banknifty','BANK NIFTY'],['finnifty','FINNIFTY'],['midcpnifty','MIDCPNIFTY'],['sensex','SENSEX'],['bankex','BANKEX'],['stock_options','Stock options']])}${select('authOptionStyle','Options style',[['','Choose an option'],['buying','Buying'],['selling','Selling'],['both','Both']])}</div><div id="investingDetail" class="conditional-profile hidden">${select('authHorizon','Investment horizon',[['','Choose an option'],['under_1y','Under 1 year'],['1_3y','1–3 years'],['3_5y','3–5 years'],['5y_plus','5+ years']])}${choices('investmentAssets','Investment instruments',[['stocks','Stocks'],['etfs','ETFs'],['mutual_funds','Mutual funds'],['index_funds','Index funds'],['bonds','Bonds'],['gold','Gold'],['other','Other']])}</div>${select('authBroker','Current broker',[['','Prefer not to say'],['zerodha','Zerodha'],['dhan','Dhan'],['upstox','Upstox'],['angel_one','Angel One'],['groww','Groww'],['icici_direct','ICICI Direct'],['hdfc_securities','HDFC Securities'],['kotak','Kotak'],['other','Other'],['none','No broker yet']])}<div class="kyc-note"><strong>KYC verification — Coming soon</strong><p>Mobile and PAN verification will be available later. Do not enter your PAN here.</p></div><div class="auth-inline-actions"><button type="button" class="auth-text-btn" data-action="basics">← Back</button></div><button class="primary-btn" type="submit">CREATE ACCOUNT <span>→</span></button></div>`;
+    setStatus('Your answers help personalize PiZero; all trading questions are optional.', 'ready');
+  }
+  function selected(name) { return [...form.querySelectorAll(`input[name="${name}"]:checked`)].map(input => input.value); }
+  function updateConditional() {
+    const roles = selected('marketRoles');
+    document.getElementById('optionsDetail')?.classList.toggle('hidden', !roles.includes('options'));
+    document.getElementById('investingDetail')?.classList.toggle('hidden', !roles.includes('investing'));
+  }
+  function validatePasswords() {
+    const password = document.getElementById('authNewPassword')?.value || '';
+    if (password.length < 8) throw new Error('Use a password with at least 8 characters.');
+    if (password !== document.getElementById('authConfirmPassword')?.value) throw new Error('The two passwords do not match.');
+    return password;
+  }
+  async function requestLink(address, reset = false) {
+    if (!validEmail(address)) throw new Error('Enter a valid email address.');
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    const {error} = reset
+      ? await client.auth.resetPasswordForEmail(address, {redirectTo})
+      : await client.auth.signInWithOtp({email:address,options:{shouldCreateUser:true,emailRedirectTo:redirectTo}});
     if (error) throw error;
-    localStorage.setItem('mftPendingSignup', JSON.stringify({method,identifier,at:Date.now()}));
-    renderVerification(identifier);
+    showSent(address, reset);
   }
-
-  async function verifyCode() {
-    const token = [...form.querySelectorAll('[data-otp]')].map(x=>x.value).join('');
-    if (!/^\d{6}$/.test(token)) throw new Error('Enter the complete 6-digit verification code.');
-    const params = method === 'email' ? {email:pendingIdentifier,token,type:'email'} : {phone:pendingIdentifier,token,type:'sms'};
-    const {data,error} = await client.auth.verifyOtp(params);
+  async function finishAccount() {
+    const roles = selected('marketRoles');
+    const onboarding = {
+      experience:value('authExperience'),capital_range:value('authCapital'),roles,
+      options_markets:roles.includes('options')?selected('optionMarkets'):[],
+      options_style:roles.includes('options')?value('authOptionStyle'):'',
+      investment_horizon:roles.includes('investing')?value('authHorizon'):'',
+      investment_assets:roles.includes('investing')?selected('investmentAssets'):[],
+      broker:value('authBroker')
+    };
+    // Save all details with the account, so they are available on another device.
+    const {data,error} = await client.auth.updateUser({password:basics.password,data:{display_name:basics.name,preferred_language:basics.language,mobile_number:basics.mobile,onboarding,mft_account_complete:true}});
     if (error) throw error;
+    if (!data.user) throw new Error('Account setup did not finish. Please try again.');
+    await client.auth.signOut();
+    clearAppProfile(); flow = 'signin'; showEntry('Account created. Sign in with your email and password.', 'success');
+  }
+  async function processLink() {
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const query = new URLSearchParams(location.search);
+    const linkError = hash.get('error_description') || query.get('error_description');
+    if (linkError) { history.replaceState(null,'',location.pathname); hideWorkspace(); showEntry(); setStatus(linkError.replace(/\+/g,' '),'error'); return true; }
+    const token = hash.get('access_token'), refresh = hash.get('refresh_token');
+    const code = query.get('code');
+    if (!((token && refresh) || code)) return false;
+    const type = hash.get('type') || query.get('type');
+    // Clear tokens from browser history before asynchronous auth calls.
+    history.replaceState(null,'',location.pathname);
+    const {data,error} = code ? await client.auth.exchangeCodeForSession(code) : await client.auth.setSession({access_token:token,refresh_token:refresh});
+    if (error) { hideWorkspace(); showEntry(); setStatus(error.message,'error'); return true; }
     const user = data.user || data.session?.user;
-    if (!user) throw new Error('Verification did not return a user account.');
+    if (type === 'recovery') { showNewPassword(); return true; }
+    if (!user) throw new Error('Verification link did not return an account.');
     if (user.user_metadata?.mft_account_complete === true) {
-      await client.auth.signOut({scope:'local'});
-      flow='signin';
-      renderEntry();
-      throw new Error('This account already exists. Sign in with your password.');
+      await client.auth.signOut(); hideWorkspace(); clearAppProfile(); flow='signin'; showEntry('An account already exists with this email. Sign in or use Forgot password.', 'error'); return true;
     }
-    renderComplete(user);
+    showBasics(user); return true;
   }
-
-  async function completeAccount() {
-    const name=(document.getElementById('authV4Name')?.value||'').trim();
-    const language=document.getElementById('authV4Language')?.value||'en';
-    const password=document.getElementById('authV4NewPassword')?.value||'';
-    const confirm=document.getElementById('authV4ConfirmPassword')?.value||'';
-    if (name.length<2) throw new Error('Enter your display name.');
-    if (password.length<8) throw new Error('Use a password with at least 8 characters.');
-    if (password!==confirm) throw new Error('The two passwords do not match.');
-    const {data,error}=await client.auth.updateUser({password,data:{display_name:name,preferred_language:language,mft_account_complete:true}});
-    if (error) throw error;
-    if (!data.user) throw new Error('Could not finish account creation.');
-    await client.auth.signOut({scope:'local'});
-    clearAppProfile();
-    localStorage.removeItem('mftPendingSignup');
-    flow='signin';
-    renderEntry('Account created successfully. Sign in with your password to continue.');
-  }
-
-  async function passwordSignIn() {
-    const identifier=currentIdentifier();
-    const password=document.getElementById('authV4Password')?.value||'';
-    if (!validIdentifier(identifier)) throw new Error(`Enter a valid ${method==='email'?'email address':'mobile number'}.`);
-    if (!password) throw new Error('Enter your password.');
-    const credentials=method==='email'?{email:identifier,password}:{phone:identifier,password};
-    const {data,error}=await client.auth.signInWithPassword(credentials);
-    if (error) throw error;
-    const user=data.user||data.session?.user;
-    if (!user) throw new Error('Sign in did not return a user account.');
-    if (user.user_metadata?.mft_account_complete!==true) {
-      await client.auth.signOut({scope:'local'});
-      throw new Error('This registration is incomplete. Choose Sign Up and finish verification/account setup.');
-    }
-    mirrorUser(user);
-    window.location.reload();
-  }
-
-  async function handleVerificationLink() {
-    const hash=new URLSearchParams(window.location.hash.replace(/^#/,''));
-    const accessToken=hash.get('access_token');
-    const refreshToken=hash.get('refresh_token');
-    const type=hash.get('type');
-    if (!accessToken||!refreshToken||!['signup','magiclink'].includes(type||'')) return false;
-    window.history.replaceState({},document.title,window.location.pathname+window.location.search);
-    const {data,error}=await client.auth.setSession({access_token:accessToken,refresh_token:refreshToken});
-    if (error) { setStatus(error.message||'Could not verify this link.','error'); return true; }
-    const user=data.user||data.session?.user;
-    if (!user) return true;
-    if (user.user_metadata?.mft_account_complete===true) {
-      await client.auth.signOut({scope:'local'});
-      flow='signin'; method=user.email?'email':'phone';
-      renderEntry();
-      setStatus('This identity is already registered. Sign in with your password.','error');
-      return true;
-    }
-    method=user.email?'email':'phone';
-    pendingIdentifier=user.email||user.phone||'';
-    clearAppProfile();
-    authScreen.classList.remove('hidden');
-    appShell.classList.add('hidden');
-    renderComplete(user);
-    return true;
-  }
-
   async function enforceSession() {
-    if (await handleVerificationLink()) return;
-    const {data}=await client.auth.getSession();
-    const user=data?.session?.user;
-    if (!user) {
-      clearAppProfile();
-      authScreen.classList.remove('hidden');
-      appShell.classList.add('hidden');
-      renderEntry();
-      return;
+    if (await processLink()) return;
+    const {data,error} = await client.auth.getSession();
+    if (error) throw error;
+    const user = data.session?.user;
+    if (!user) { clearAppProfile(); hideWorkspace(); showEntry(); return; }
+    if (user.user_metadata?.mft_account_complete === true) {
+      mirrorUser(user); renderAccountProfile(user); authScreen.classList.add('hidden'); appShell.classList.remove('hidden'); return;
     }
-    if (user.user_metadata?.mft_account_complete===true) {
-      mirrorUser(user);
-      authScreen.classList.add('hidden');
-      appShell.classList.remove('hidden');
-      return;
-    }
-    method=user.email?'email':'phone';
-    pendingIdentifier=user.email||user.phone||'';
-    clearAppProfile();
-    authScreen.classList.remove('hidden');
-    appShell.classList.add('hidden');
-    renderComplete(user);
+    showBasics(user);
   }
-
-  flowTabs.addEventListener('click',e=>{
-    const b=e.target.closest('[data-flow]'); if(!b||busy)return;
-    flow=b.dataset.flow==='signup'?'signup':'signin'; renderEntry();
+  tabs.addEventListener('click', event => {
+    const button = event.target.closest('[data-flow]');
+    if (!button || busy) return;
+    flow = button.dataset.flow; showEntry();
   });
-  methodTabs.addEventListener('click',e=>{
-    const b=e.target.closest('[data-method]'); if(!b||busy)return;
-    method=b.dataset.method==='phone'?'phone':'email'; renderEntry();
-  });
-  form.addEventListener('click',e=>{
-    const toggle=e.target.closest('[data-toggle-password]');
-    if(toggle){const input=document.getElementById(toggle.dataset.togglePassword);if(input){input.type=input.type==='password'?'text':'password';toggle.textContent=input.type==='password'?'SHOW':'HIDE';}return;}
-    if(e.target.id==='authV4Back'){renderEntry();return;}
-    if(e.target.id==='authV4Resend'){
-      e.preventDefault(); if(!pendingIdentifier||busy)return; setBusy(true);
-      sendVerification(pendingIdentifier).then(()=>setStatus('A new verification message was sent.','success')).catch(err=>setStatus(err.message||'Could not resend verification.','error')).finally(()=>setBusy(false));
+  form.addEventListener('change', event => { if (event.target.name === 'marketRoles') updateConditional(); });
+  form.addEventListener('click', async event => {
+    const toggle = event.target.closest('[data-toggle-password]');
+    if (toggle) { const input = document.getElementById(toggle.dataset.togglePassword); input.type = input.type === 'password'?'text':'password'; toggle.textContent=input.type==='password'?'SHOW':'HIDE'; return; }
+    const action = event.target.closest('[data-action]')?.dataset.action;
+    if (!action || busy) return;
+    if (action === 'forgot') showResetRequest();
+    if (action === 'back') { flow='signin'; showEntry(); }
+    if (action === 'basics') showBasics(accountUser);
+    if (action === 'resend') {
+      setBusy(true);
+      try { await requestLink(form.dataset.sentEmail,form.dataset.sentReset === 'true'); }
+      catch (error) { setStatus(error.message,'error'); }
+      finally { setBusy(false); }
     }
   });
-  form.addEventListener('submit',async e=>{
-    e.preventDefault(); if(busy)return; setBusy(true);
-    try{
-      if(flow==='signin'){await passwordSignIn();return;}
-      if(document.getElementById('authV4NewPassword')){await completeAccount();return;}
-      if(form.querySelector('[data-otp]')){await verifyCode();return;}
-      const identifier=currentIdentifier();
-      if(!validIdentifier(identifier))throw new Error(`Enter a valid ${method==='email'?'email address':'mobile number'}.`);
-      await sendVerification(identifier);
-    }catch(err){setStatus(err?.message||'Authentication could not be completed.','error');}
-    finally{setBusy(false);}
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); if (busy) return; setBusy(true);
+    try {
+      if (stage === 'entry' && flow === 'signin') {
+        const address = email(), password = document.getElementById('authPassword')?.value || '';
+        if (!validEmail(address) || !password) throw new Error('Enter a valid email and password.');
+        const {data,error} = await client.auth.signInWithPassword({email:address,password});
+        if (error) throw error;
+        const user = data.user || data.session?.user;
+        if (!user || user.user_metadata?.mft_account_complete !== true) {
+          await client.auth.signOut(); throw new Error('Account setup is incomplete. Choose Sign Up to finish registration.');
+        }
+        mirrorUser(user); location.reload(); return;
+      }
+      if (stage === 'entry' || stage === 'forgot') { await requestLink(email(),stage==='forgot'); return; }
+      if (stage === 'reset') {
+        const password = validatePasswords();
+        const {error} = await client.auth.updateUser({password}); if (error) throw error;
+        await client.auth.signOut(); clearAppProfile(); flow='signin'; showEntry('Password updated. Sign in with your new password.','success'); return;
+      }
+      if (stage === 'basics') {
+        const name = value('authName'), mobile = value('authMobile');
+        if (name.length < 2) throw new Error('Enter a display name of at least 2 characters.');
+        if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile.replace(/[\s()-]/g,''))) throw new Error('Enter the mobile number with country code, such as +91 98765 43210.');
+        basics = {name,mobile,language:value('authLanguage'),password:validatePasswords()};
+        showTrading(); return;
+      }
+      if (stage === 'trading') await finishAccount();
+    } catch (error) { setStatus(error.message || 'Could not complete this request.','error'); }
+    finally { setBusy(false); }
   });
-
-  signOutBtn?.addEventListener('click',async()=>{
-    try{await client.auth.signOut({scope:'local'});}catch(_){}
-    clearAppProfile(); flow='signin'; method='email';
-    authScreen.classList.remove('hidden'); appShell.classList.add('hidden'); renderEntry('You have been signed out.');
+  signOutBtn?.addEventListener('click', async () => {
+    await client.auth.signOut(); clearAppProfile(); flow='signin'; hideWorkspace(); showEntry('You have signed out.','success');
   });
-
-  enforceSession().catch(()=>{
-    clearAppProfile(); authScreen.classList.remove('hidden'); appShell.classList.add('hidden'); renderEntry();
-    setStatus('Authentication service is temporarily unavailable. Please try again.','error');
+  enforceSession().catch(error => {
+    clearAppProfile(); hideWorkspace(); showEntry(); setStatus(error.message || 'Authentication service is unavailable.','error');
   });
 })();

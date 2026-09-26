@@ -253,14 +253,14 @@ class Handler(SimpleHTTPRequestHandler):
                 "</head>",
                 f'<script>window.MFT_AUTH_CONFIG={auth_config};</script>'
                 '<link rel="stylesheet" href="auto-score.css?v=2.8">'
-                '<link rel="stylesheet" href="auth-v3.css?v=2.8">'
+                '<link rel="stylesheet" href="auth-v3.css?v=2.9">'
                 '<link rel="stylesheet" href="accessibility.css?v=1"></head>',
             )
             html = html.replace(
                 "</body>",
                 '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>'
                 '<script src="auto-score.js?v=1"></script>'
-                '<script src="auth-v3.js?v=1"></script></body>',
+                '<script src="auth-v3.js?v=2"></script></body>',
             )
             body = html.encode("utf-8")
             self.send_response(200)

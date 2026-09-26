@@ -1,17 +1,17 @@
-const CACHE = 'market-forward-test-v2-8';
+const CACHE = 'market-forward-test-v2-9';
 const ASSETS = [
   './',
   './index.html',
   './styles.css?v=2.8',
   './theme.css?v=2.8',
   './brand.css?v=2.8',
-  './auth-v3.css?v=2.8',
+  './auth-v3.css?v=2.9',
   './accessibility.css?v=1',
   './text-size.js?v=1',
   './pizero-logo.png',
   './app.js?v=2.3',
-  './auth-v3.js?v=1',
-  './auth-v4.js?v=1',
+  './auth-v3.js?v=2',
+  './auth-v4.js?v=2',
   './auto-score.css?v=2.8',
   './auto-score.js?v=1',
   './manifest.webmanifest?v=2.8',

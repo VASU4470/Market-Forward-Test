@@ -17,47 +17,24 @@ A mobile-first PWA prototype for Indian market traders.
 - Preference stays on this browser across reloads and sign-in/sign-out, and syncs between tabs.
 - Relative font sizes preserve native browser zoom; compact captions now have a 12px base minimum.
 
-## Current features
-- Professional account/login UI
-- Email / Mobile passwordless OTP authentication UI
-- Local-beta fallback when Supabase is not configured
-- Separate prediction history per profile
-- Profile editing and profile switching in local-beta mode
-- History filters: All, Last 7, Last 30, Scored
-- Profile stats: predictions, scored sessions, best score
-- India Standard Time (`Asia/Kolkata`) for trading dates and lock times
-- Responsive desktop/tablet/mobile layout
-- Light and dark themes
-- Automatic Nifty result retrieval pilot
-- Manual result entry retained as a fallback
+## Account setup (Supabase)
 
-## Secure authentication pilot
-V2.7 includes a Supabase passwordless-auth controller.
+Production accounts use email and password. New users choose **Sign Up**, receive an email verification link, return to PiZero, complete personal details and a market profile, create a password, and then sign in normally. Existing users can request a password reset link. Email links must redirect to the deployed PiZero URL.
 
-When Supabase is configured, the login becomes:
-- Email → send OTP → verify 6-digit code → sign in
-- Mobile → send SMS OTP → verify 6-digit code → sign in
+The personal form asks for a display name, preferred language, and an optional mobile number. The market form offers experience, capital ranges, trading and investing interests, conditional options and investing questions, and a broker choice. These fields are stored in Supabase user metadata and mirrored into local browser storage. PAN is not collected. Mobile and PAN KYC verification are marked “Coming soon”; mobile cannot be used for authentication. Predictions and score history remain local to each browser in this release.
 
-The browser receives only the Supabase **publishable / anon key**, which is intended for client use. Never use a Supabase service-role key in this app or expose it in browser code.
+Supabase may avoid revealing whether an email exists when a verification/reset email is requested. An existing account is identified after the owner opens the email link; PiZero then offers password sign in/reset. Unverified mobile numbers cannot be checked for uniqueness.
 
-### Supabase environment variables
-Run the local server with:
+### Deployment settings
 
-```bash
-export SUPABASE_URL='https://YOUR_PROJECT.supabase.co'
-export SUPABASE_PUBLISHABLE_KEY='YOUR_PUBLISHABLE_KEY'
-python3 server.py
+Render environment variables:
+
+```text
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
 ```
 
-For older Supabase projects, `SUPABASE_ANON_KEY` is also accepted by the dev server.
-
-If these variables are not set, the app stays in local-beta mode and email local profiles continue to work.
-
-### Email OTP
-In Supabase Auth, enable email authentication and configure the email template to send a numeric OTP token. For public/production delivery, configure a custom SMTP provider.
-
-### Mobile OTP
-Enable Phone Auth and configure an SMS provider supported by Supabase. For an India-focused production launch, confirm the sender/template flow complies with applicable TRAI/DLT requirements.
+Use only a browser-safe publishable/anon key, never the service-role key. In Supabase Authentication, enable Email and set the Site URL and allowed Redirect URLs to the exact deployed origin (including `https://`). Confirm that the email template contains a working confirmation link and that password reset emails are enabled. A frontend push cannot set these dashboard values. Production fails closed with a configuration error when Supabase is absent; localhost retains the local prototype for development.
 
 ## Automatic scoring pilot
 The automatic-scoring development server uses Upstox Historical Data V3 and keeps the market-data credential on the server side. The browser never receives the token.
@@ -93,7 +70,7 @@ python3 server.py
 The app will explain that automatic market data is not configured and reveal the manual fallback.
 
 ## Current data limitation
-Until cloud profile storage is added, prediction history is still mirrored into browser `localStorage` after authentication. The OTP verifies identity, but the next backend step is moving predictions/history into Supabase PostgreSQL with Row Level Security.
+Until cloud profile storage is added, prediction history is still mirrored into browser `localStorage` after authentication. Email verification confirms identity, but the next backend step is moving predictions/history into Supabase PostgreSQL with Row Level Security.
 
 ## What this version intentionally does NOT include
 - Trading execution
@@ -119,7 +96,7 @@ If the `code` command is not installed on macOS, open VS Code and choose **File 
 
 ## Production architecture direction
 Recommended backend foundation:
-- Supabase Auth for email/mobile OTP and optional Google sign-in
+- Supabase Auth for verified email and password, with future KYC support
 - PostgreSQL for cloud history
 - Row Level Security so users can access only their own records
 - immutable locked predictions
