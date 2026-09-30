@@ -21,7 +21,7 @@ A mobile-first PWA prototype for Indian market traders.
 
 Production accounts use email and password. New users choose **Sign Up**, receive an email verification link, return to PiZero, complete personal details and a market profile, create a password, and then sign in normally. Existing users can request a password reset link. Email links must redirect to the deployed PiZero URL.
 
-The personal form asks for a display name, preferred language, and an optional mobile number. The market form offers experience, capital ranges, trading and investing interests, conditional options and investing questions, and a broker choice. These fields are stored in Supabase user metadata and mirrored into local browser storage. PAN is not collected. Mobile and PAN KYC verification are marked “Coming soon”; mobile cannot be used for authentication. Predictions and score history remain local to each browser in this release.
+The personal form asks for a unique username, display name, preferred language, and an optional mobile number. Users can opt into public rankings. The market form offers experience, capital ranges, trading and investing interests, conditional options and investing questions, and a broker choice. These fields are stored in Supabase user metadata and the `profiles` table, and mirrored into local browser storage. PAN is not collected. Mobile and PAN KYC verification are marked “Coming soon”; mobile cannot be used for authentication. Predictions and score history remain local to each browser in this release, so the full cross-user score leaderboard requires the later cloud-history migration.
 
 Supabase may avoid revealing whether an email exists when a verification/reset email is requested. An existing account is identified after the owner opens the email link; PiZero then offers password sign in/reset. Unverified mobile numbers cannot be checked for uniqueness.
 
@@ -32,9 +32,10 @@ Render environment variables:
 ```text
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
 ```
 
-Use only a browser-safe publishable/anon key, never the service-role key. In Supabase Authentication, enable Email and set the Site URL and allowed Redirect URLs to the exact deployed origin (including `https://`). Confirm that the email template contains a working confirmation link and that password reset emails are enabled. A frontend push cannot set these dashboard values. Production fails closed with a configuration error when Supabase is absent; localhost retains the local prototype for development.
+Use the publishable/anon key in the browser. The service-role key is server-only and is used only for permanent account deletion; never expose it in HTML or client JavaScript. Before deploying the profile flow, run `supabase_profile_schema.sql` once in the Supabase SQL Editor. It creates the unique username constraint, profile RLS policies, and the opt-in public-profile view. In Supabase Authentication, enable Email and set the Site URL and allowed Redirect URLs to the exact deployed origin (including `https://`). Confirm that the email template contains a working confirmation link and that password reset emails are enabled. A frontend push cannot set these dashboard values. Production fails closed with a configuration error when Supabase is absent; localhost retains the local prototype for development.
 
 ## Local profile onboarding preview
 
@@ -109,3 +110,4 @@ Recommended backend foundation:
 - scheduled end-of-day market result ingestion
 
 For commercial production, use market data under terms that explicitly permit the intended display, processing, and distribution. Do not rely on scraping exchange webpages.
+
