@@ -232,6 +232,48 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def request_json(self):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            return json.loads(self.rfile.read(length) or b"{}")
+        except (ValueError, json.JSONDecodeError):
+            return {}
+
+    def do_POST(self):
+        if self.path != "/api/account/delete":
+            self.send_json(404, {"error": "Not found"})
+            return
+        supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+        service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+        auth_header = self.headers.get("Authorization", "")
+        token = auth_header.removeprefix("Bearer ").strip()
+        if not supabase_url or not service_key or not token:
+            self.send_json(503, {"error": "Account deletion is not configured."})
+            return
+        try:
+            user_request = urllib.request.Request(
+                f"{supabase_url}/auth/v1/user",
+                headers={"apikey": service_key, "Authorization": f"Bearer {token}"},
+            )
+            with urllib.request.urlopen(user_request, timeout=15) as response:
+                user = json.load(response)
+            user_id = user.get("id")
+            if not user_id:
+                raise RuntimeError("Invalid authenticated user")
+            delete_request = urllib.request.Request(
+                f"{supabase_url}/auth/v1/admin/users/{urllib.parse.quote(user_id)}",
+                method="DELETE",
+                headers={"apikey": service_key, "Authorization": f"Bearer {service_key}"},
+            )
+            with urllib.request.urlopen(delete_request, timeout=15):
+                pass
+            self.send_json(200, {"deleted": True})
+        except urllib.error.HTTPError as error:
+            self.send_json(error.code, {"error": "The account could not be deleted."})
+        except (urllib.error.URLError, TimeoutError, RuntimeError):
+            self.send_json(502, {"error": "The account deletion service is temporarily unavailable."})
+        return
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/market-result":
@@ -290,3 +332,4 @@ if __name__ == "__main__":
     if auth_state != "configured":
         print("Tip: export SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to activate secure account authentication.")
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
