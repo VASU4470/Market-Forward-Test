@@ -132,6 +132,25 @@
   const value = id => (document.getElementById(id)?.value || '').trim();
   const email = () => value('authEmail').toLowerCase();
   const validEmail = address => /^\S+@\S+\.\S+$/.test(address);
+  const normalizeUsername = input => String(input || '').trim().replace(/^@+/, '').toLowerCase();
+  const validUsername = input => /^[a-z0-9_]{3,24}$/.test(normalizeUsername(input));
+  async function usernameAvailable(username, ownId = null) {
+    const normalized = normalizeUsername(username);
+    const {data, error} = await client.from('profiles').select('id').eq('username_normalized', normalized).maybeSingle();
+    if (error) throw new Error('Profile storage is not configured yet. Apply supabase_profile_schema.sql in Supabase before creating accounts.');
+    return !data || data.id === ownId;
+  }
+  async function saveCloudProfile(user, details) {
+    const username = normalizeUsername(details.username);
+    const {error} = await client.from('profiles').upsert({
+      id: user.id, username, display_name: details.displayName, ranking_opt_in: Boolean(details.rankingOptIn),
+      preferred_language: details.language || 'en'
+    }, {onConflict:'id'});
+    if (error) {
+      if (error.code === '23505') throw new Error('That username is already taken. Choose another one.');
+      throw error;
+    }
+  }
   function setStatus(message, kind = 'ready') { status.className = `auth-status-v3 ${kind}`; status.textContent = message; }
   function setBusy(next) { busy = next; card.classList.toggle('auth-busy', next); }
   function hideWorkspace() { authScreen.classList.remove('hidden'); appShell.classList.add('hidden'); }
@@ -166,24 +185,56 @@
     const safeForm = profileForm.cloneNode(false);
     profileForm.replaceWith(safeForm);
     safeForm.innerHTML = `<div class="panel-head"><div><span class="section-kicker">ACCOUNT</span><h2>Personal information</h2></div></div>
+      <label class="field-label"><span>Username</span><input id="accountUsername" maxlength="24" required value="${escapeHtml(meta.username || '')}" /><small class="auth-helper-v3">Your unique public identity. Letters, numbers, and underscores only.</small></label>
       <label class="field-label"><span>Display name</span><input id="accountName" maxlength="80" required value="${escapeHtml(meta.display_name || '')}" /></label>
       <label class="field-label"><span>Verified email</span><input type="email" readonly value="${escapeHtml(user.email)}" /></label>
       <label class="field-label"><span>Mobile (unverified)</span><input id="accountMobile" type="tel" maxlength="24" value="${escapeHtml(meta.mobile_number || '')}" placeholder="Optional, include country code" /></label>
       <label class="field-label"><span>Preferred language</span><select id="accountLanguage"><option value="en">English</option><option value="ta">தமிழ்</option></select></label>
+      <label class="field-label"><span class="checkbox-line"><input id="accountRankingOptIn" type="checkbox" ${meta.ranking_opt_in ? 'checked' : ''} /> Participate in the public ranking</span><small class="auth-helper-v3">Only your username and ranking information are public.</small></label>
       <button class="primary-btn" type="submit">SAVE PERSONAL DETAILS</button>
+      <div class="account-security"><h3>Security</h3><button type="button" class="auth-text-btn" data-account-action="password">Change password</button><button type="button" class="auth-text-btn" data-account-action="email">Change email</button><button type="button" class="auth-text-btn" data-account-action="signout-all">Sign out all devices</button></div>
       <div class="kyc-note"><strong>KYC verification — Coming soon</strong><p>Mobile and PAN verification are not available yet. PAN is not collected.</p></div>
-      <div class="account-summary"><h3>Market profile</h3><p>Interests: ${escapeHtml((details.roles || []).join(', ') || 'Not specified')}</p><p>Experience: ${escapeHtml(details.experience || 'Not specified')} · Capital range: ${escapeHtml(details.capital_range || 'Not specified')}</p><p>Broker: ${escapeHtml(details.broker || 'Not specified')}</p></div>`;
+      <div class="account-summary"><h3>Market profile</h3><p>Interests: ${escapeHtml((details.roles || []).join(', ') || 'Not specified')}</p><p>Experience: ${escapeHtml(details.experience || 'Not specified')} · Capital range: ${escapeHtml(details.capital_range || 'Not specified')}</p><p>Broker: ${escapeHtml(details.broker || 'Not specified')}</p></div><div class="account-danger"><h3>Danger zone</h3><p>Permanently delete your account, profile, and local forward-test record.</p><button type="button" class="danger-btn" data-account-action="delete">DELETE ACCOUNT PERMANENTLY</button></div>`;
     safeForm.querySelector('#accountLanguage').value = meta.preferred_language || 'en';
     safeForm.addEventListener('submit', async event => {
       event.preventDefault();
-      const name = safeForm.querySelector('#accountName').value.trim();
+      const username = normalizeUsername(safeForm.querySelector('#accountUsername').value), name = safeForm.querySelector('#accountName').value.trim();
       const mobile = safeForm.querySelector('#accountMobile').value.trim();
+      if (!validUsername(username)) { alert('Choose a username with 3–24 lowercase letters, numbers, or underscores.'); return; }
+      if (!(await usernameAvailable(username, user.id))) { alert('That username is already taken. Choose another one.'); return; }
       if (name.length < 2) { alert('Enter a display name of at least 2 characters.'); return; }
       if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile.replace(/[\s()-]/g,''))) { alert('Include the mobile country code.'); return; }
-      const {data,error} = await client.auth.updateUser({data:{display_name:name,mobile_number:mobile,preferred_language:safeForm.querySelector('#accountLanguage').value}});
+      const rankingOptIn = Boolean(safeForm.querySelector('#accountRankingOptIn').checked);
+      const {data,error} = await client.auth.updateUser({data:{username,display_name:name,mobile_number:mobile,preferred_language:safeForm.querySelector('#accountLanguage').value,ranking_opt_in:rankingOptIn}});
       if (error) { alert(error.message); return; }
+      await saveCloudProfile(data.user, {username,displayName:name,language:safeForm.querySelector('#accountLanguage').value,rankingOptIn});
       mirrorUser(data.user);
       location.reload();
+    });
+    safeForm.addEventListener('click', async event => {
+      const action = event.target.closest('[data-account-action]')?.dataset.accountAction;
+      if (!action) return;
+      if (action === 'password') {
+        const next = prompt('Enter a new password (at least 8 characters):');
+        if (!next || next.length < 8) return alert('Use at least 8 characters.');
+        const {error} = await client.auth.updateUser({password:next});
+        alert(error ? error.message : 'Password changed successfully.');
+      } else if (action === 'email') {
+        const next = prompt('Enter your new email address:');
+        if (!validEmail(String(next || '').trim())) return alert('Enter a valid email address.');
+        const {error} = await client.auth.updateUser({email:String(next).trim().toLowerCase()});
+        alert(error ? error.message : 'Confirmation links were sent to your email addresses.');
+      } else if (action === 'signout-all') {
+        const {error} = await client.auth.signOut({scope:'others'});
+        alert(error ? error.message : 'Other sessions have been signed out.');
+      } else if (action === 'delete') {
+        if (prompt('Type DELETE to permanently remove your account:') !== 'DELETE') return;
+        const {data:{session}} = await client.auth.getSession();
+        const response = await fetch('/api/account/delete', {method:'POST',headers:{Authorization:`Bearer ${session?.access_token || ''}`}});
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) return alert(result.error || 'Account deletion is not configured yet.');
+        await client.auth.signOut(); clearAppProfile(); flow='signin'; hideWorkspace(); showEntry('Your account was permanently deleted.','success');
+      }
     });
   }
   function showEntry(message = '', kind = 'ready') {
@@ -224,7 +275,7 @@
     stage = 'basics'; accountUser = user; tabs.classList.add('hidden'); hideWorkspace(); clearAppProfile();
     title.textContent = 'Complete your profile.';
     subtitle.textContent = 'Step 1 of 2 · Personal details and account security.';
-    form.innerHTML = `<div class="complete-stage-v3"><span class="section-kicker">EMAIL VERIFIED</span><h3>${escapeHtml(user.email)}</h3><label class="field-label"><span>Display name *</span><input id="authName" autocomplete="name" maxlength="80" required value="${escapeHtml(basics?.name || user.user_metadata?.display_name || '')}" /></label><label class="field-label"><span>Mobile number (optional)</span><input id="authMobile" type="tel" autocomplete="tel" maxlength="24" placeholder="+91 98765 43210" value="${escapeHtml(basics?.mobile || '')}" /></label><p class="auth-helper-v3">Mobile verification is part of KYC — coming soon. This number cannot be used to sign in yet.</p><label class="field-label"><span>Preferred language</span><select id="authLanguage"><option value="en">English</option><option value="ta">தமிழ்</option></select></label>${passwordField('authNewPassword','Create password','new-password')}${passwordField('authConfirmPassword','Confirm password','new-password')}<div class="password-rules">Use at least 8 characters.</div><button class="primary-btn" type="submit">CONTINUE <span>→</span></button></div>`;
+    form.innerHTML = `<div class="complete-stage-v3"><span class="section-kicker">EMAIL VERIFIED</span><h3>${escapeHtml(user.email)}</h3><label class="field-label"><span>Unique username *</span><input id="authUsername" autocomplete="username" maxlength="24" required placeholder="vasanthtrades" value="${escapeHtml(basics?.username || user.user_metadata?.username || '')}" /><small class="auth-helper-v3">3–24 characters: letters, numbers, and underscores.</small></label><label class="field-label"><span>Display name *</span><input id="authName" autocomplete="name" maxlength="80" required value="${escapeHtml(basics?.name || user.user_metadata?.display_name || '')}" /></label><label class="field-label"><span>Mobile number (optional)</span><input id="authMobile" type="tel" autocomplete="tel" maxlength="24" placeholder="+91 98765 43210" value="${escapeHtml(basics?.mobile || '')}" /></label><p class="auth-helper-v3">Mobile verification is part of KYC — coming soon. This number cannot be used to sign in yet.</p><label class="field-label"><span>Preferred language</span><select id="authLanguage"><option value="en">English</option><option value="ta">தமிழ்</option></select></label><label class="field-label"><span class="checkbox-line"><input id="authRankingOptIn" type="checkbox" /> Participate in the public ranking</span><small class="auth-helper-v3">Only your username and performance rank will be public.</small></label>${passwordField('authNewPassword','Create password','new-password')}${passwordField('authConfirmPassword','Confirm password','new-password')}<div class="password-rules">Use at least 8 characters.</div><button class="primary-btn" type="submit">CONTINUE <span>→</span></button></div>`;
     document.getElementById('authLanguage').value = basics?.language || user.user_metadata?.preferred_language || 'en';
     setStatus('Your email is verified. Finish both steps before signing in.', 'success');
   }
@@ -268,9 +319,10 @@
       broker:value('authBroker')
     };
     // Save all details with the account, so they are available on another device.
-    const {data,error} = await client.auth.updateUser({password:basics.password,data:{display_name:basics.name,preferred_language:basics.language,mobile_number:basics.mobile,onboarding,mft_account_complete:true}});
+    const {data,error} = await client.auth.updateUser({password:basics.password,data:{username:basics.username,display_name:basics.name,preferred_language:basics.language,mobile_number:basics.mobile,onboarding,ranking_opt_in:basics.rankingOptIn,mft_account_complete:true}});
     if (error) throw error;
     if (!data.user) throw new Error('Account setup did not finish. Please try again.');
+    await saveCloudProfile(data.user, {username:basics.username, displayName:basics.name, language:basics.language, rankingOptIn:basics.rankingOptIn});
     await client.auth.signOut();
     clearAppProfile(); flow = 'signin'; showEntry('Account created. Sign in with your email and password.', 'success');
   }
@@ -348,10 +400,12 @@
         await client.auth.signOut(); clearAppProfile(); flow='signin'; showEntry('Password updated. Sign in with your new password.','success'); return;
       }
       if (stage === 'basics') {
-        const name = value('authName'), mobile = value('authMobile');
+        const username = normalizeUsername(value('authUsername')), name = value('authName'), mobile = value('authMobile');
+        if (!validUsername(username)) throw new Error('Choose a username with 3–24 lowercase letters, numbers, or underscores.');
+        if (!(await usernameAvailable(username))) throw new Error('That username is already taken. Choose another one.');
         if (name.length < 2) throw new Error('Enter a display name of at least 2 characters.');
         if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile.replace(/[\s()-]/g,''))) throw new Error('Enter the mobile number with country code, such as +91 98765 43210.');
-        basics = {name,mobile,language:value('authLanguage'),password:validatePasswords()};
+        basics = {username,name,mobile,language:value('authLanguage'),rankingOptIn:Boolean(document.getElementById('authRankingOptIn')?.checked),password:validatePasswords()};
         showTrading(); return;
       }
       if (stage === 'trading') await finishAccount();
@@ -365,3 +419,4 @@
     clearAppProfile(); hideWorkspace(); showEntry(); setStatus(error.message || 'Authentication service is unavailable.','error');
   });
 })();
+
