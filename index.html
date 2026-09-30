@@ -139,7 +139,7 @@
         <section id="today" class="view active">
           <div class="page-heading">
             <div><span class="section-kicker" id="todayLabel">TODAY · NIFTY</span><h1 id="dateHeading"></h1><p class="muted" id="todayIntro">Record your pre-market view and lock it before the session.</p></div>
-            <div class="market-chip"><span class="live-dot"></span><div><small>MARKET</small><b>NIFTY 50</b></div></div>
+            <div class="market-chip"><span class="live-dot"></span><div><small>MARKET</small><select id="indexSelect" aria-label="Market index"></select></div></div>
           </div>
 
           <div id="lockedBanner" class="locked-banner hidden"></div>
@@ -265,6 +265,10 @@
     </div>
   </dialog>
 
+  <script src="services/api-client.js?v=1"></script>
+  <script src="services/indices-service.js?v=1"></script>
+  <script src="services/profile-service.js?v=1"></script>
+  <script src="services/prediction-service.js?v=1"></script>
   <script src="app.js?v=2.3"></script>
 </body>
 </html>

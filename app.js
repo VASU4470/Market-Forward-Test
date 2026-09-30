@@ -61,11 +61,14 @@ if (!root.profiles) root.profiles = {};
 let historyFilter = 'all';
 let draft = { bias:null, opening:null, dayType:null, support:'', resistance:'' };
 let pendingPrediction = null;
+let indices = [];
+let selectedIndexId = 'local-nifty50';
 
 function saveRoot(){ localStorage.setItem(ROOT_KEY, JSON.stringify(root)); }
 function activeProfile(){ return root.activeProfile ? root.profiles[root.activeProfile] : null; }
 function activeState(){ return activeProfile()?.state || null; }
-function current(){ return activeState()?.predictions.find(p => p.date === dateKey); }
+function current(){ return activeState()?.predictions.find(p => p.date === dateKey && (p.indexId || 'local-nifty50') === selectedIndexId); }
+function selectedIndex(){ return indices.find(item => item.id === selectedIndexId) || indices[0] || {id:'local-nifty50', display_name:'NIFTY 50'}; }
 
 function profileIdFromEmail(email){
   return email.trim().toLowerCase();
@@ -116,7 +119,7 @@ const i18n = {
 function setLanguage(){
   const state = activeState(); if (!state) return;
   const t = i18n[state.language];
-  $('todayLabel').textContent = t.todayLabel;
+  $('todayLabel').textContent = `${t.todayLabel.split('·')[0].trim()} · ${selectedIndex().display_name}`;
   $('todayIntro').textContent = t.intro;
   $('biasQuestion').textContent = t.bias;
   $('openQuestion').textContent = t.opening;
@@ -245,12 +248,27 @@ $('predictionForm').addEventListener('submit', e => {
 
 $('cancelLock').onclick = () => $('lockDialog').close();
 
-$('confirmLock').onclick = () => {
+$('confirmLock').onclick = async () => {
   if (!pendingPrediction) return;
   const state = activeState();
-  state.predictions.push({
-    date:dateKey, ...pendingPrediction, lockedAt:new Date().toISOString(), actual:null, score:null
-  });
+  const prediction = { date:dateKey, indexId:selectedIndexId, ...pendingPrediction, lockedAt:new Date().toISOString(), actual:null, score:null };
+  state.predictions.push(prediction);
+  try {
+    if (window.PiZeroServices?.predictions && window.__MFT_SUPABASE_CLIENT) {
+      await window.PiZeroServices.predictions.createPrediction({
+        index_id: selectedIndexId,
+        trading_date: prediction.date,
+        bias: prediction.bias,
+        opening_view: prediction.opening,
+        day_type: prediction.dayType,
+        support: Number(prediction.support),
+        resistance: Number(prediction.resistance)
+      });
+      prediction.cloudSync = 'synced';
+    }
+  } catch (_) {
+    prediction.cloudSync = 'pending';
+  }
   saveRoot(); $('lockDialog').close(); pendingPrediction=null; renderAll();
 };
 
@@ -303,6 +321,13 @@ function renderToday(){
     $('support').value=''; $('resistance').value=''; syncChoiceButtons();
     $('lockedBanner').classList.add('hidden');
   }
+}
+
+function renderIndexSelector(){
+  const select = $('indexSelect');
+  if (!select) return;
+  select.innerHTML = indices.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.display_name)}</option>`).join('');
+  select.value = selectedIndexId;
 }
 
 function renderResult(){
@@ -389,9 +414,34 @@ function renderProfile(){
 function renderAll(){
   const p=activeProfile(); if(!p){ showAuth(); return; }
   ensureProfileState(p);
-  setLanguage(); renderToday(); renderResult(); renderHistory(); renderScore(); renderProfile();
+  setLanguage(); renderIndexSelector(); renderToday(); renderResult(); renderHistory(); renderScore(); renderProfile();
   saveRoot();
 }
+
+async function loadIndexCatalog(){
+  const fallback = [{id:'local-nifty50', code:'NIFTY50', display_name:'NIFTY 50'}];
+  try {
+    const remote = await window.PiZeroServices.indices.getIndices();
+    indices = remote.length ? remote : fallback;
+  } catch (_) {
+    indices = fallback;
+  }
+  if (!indices.some(item => item.id === selectedIndexId)) {
+    const nextId = indices[0].id;
+    Object.values(root.profiles || {}).forEach(profile => {
+      (profile.state?.predictions || []).forEach(prediction => {
+        if (!prediction.indexId || prediction.indexId === 'local-nifty50') prediction.indexId = nextId;
+      });
+    });
+    selectedIndexId = nextId;
+  }
+  renderAll();
+}
+
+document.getElementById('indexSelect')?.addEventListener('change', event => {
+  selectedIndexId = event.target.value;
+  renderAll();
+});
 
 $('langToggle').onclick=()=>{
   const state=activeState(); state.language=state.language==='en'?'ta':'en'; saveRoot(); renderAll();
@@ -409,6 +459,8 @@ function navigate(target){
 document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.target)));
 
 applyTheme(currentTheme());
+
+loadIndexCatalog();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));

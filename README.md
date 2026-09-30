@@ -77,6 +77,12 @@ The app will explain that automatic market data is not configured and reveal the
 ## Current data limitation
 Until cloud profile storage is added, prediction history is still mirrored into browser `localStorage` after authentication. Email verification confirms identity, but the next backend step is moving predictions/history into Supabase PostgreSQL with Row Level Security.
 
+## Phase 1 cloud data layer
+
+Phase 1 adds a reusable authenticated API for profiles, data-driven indexes, and locked predictions. Before deploying the Phase 1 code, run `supabase_phase1_schema.sql` in the Supabase SQL Editor. The migration is designed to preserve existing profile rows and can be run after `supabase_profile_schema.sql`.
+
+The browser calls `/api/v1/indices`, `/api/v1/profile`, and `/api/v1/predictions`. Protected endpoints require the Supabase access token; the server derives the user ID from that token and ignores any browser-supplied user ID. Local prediction data remains available as a temporary migration fallback until cloud storage is confirmed.
+
 ## What this version intentionally does NOT include
 - Trading execution
 - Portfolio access
@@ -110,4 +116,3 @@ Recommended backend foundation:
 - scheduled end-of-day market result ingestion
 
 For commercial production, use market data under terms that explicitly permit the intended display, processing, and distribution. Do not rely on scraping exchange webpages.
-

@@ -10,6 +10,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from backend.routes.api import handle as handle_api
+
 ROOT = Path(__file__).resolve().parent
 INDIA_TZ = ZoneInfo("Asia/Kolkata")
 INSTRUMENT_KEY = "NSE_INDEX|Nifty 50"
@@ -240,6 +242,10 @@ class Handler(SimpleHTTPRequestHandler):
             return {}
 
     def do_POST(self):
+        if self.path.startswith("/api/v1/"):
+            status, payload = handle_api(self, "POST", urllib.parse.urlparse(self.path).path)
+            self.send_json(status, payload)
+            return
         if self.path != "/api/account/delete":
             self.send_json(404, {"error": "Not found"})
             return
@@ -276,6 +282,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith("/api/v1/"):
+            status, payload = handle_api(self, "GET", parsed.path)
+            self.send_json(status, payload)
+            return
         if parsed.path == "/api/market-result":
             query = urllib.parse.parse_qs(parsed.query)
             date = (query.get("date") or [""])[0]
@@ -315,6 +325,14 @@ class Handler(SimpleHTTPRequestHandler):
 
         return super().do_GET()
 
+    def do_PATCH(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith("/api/v1/"):
+            status, payload = handle_api(self, "PATCH", parsed.path)
+            self.send_json(status, payload)
+            return
+        self.send_json(404, {"error": "Not found"})
+
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         super().end_headers()
@@ -332,4 +350,3 @@ if __name__ == "__main__":
     if auth_state != "configured":
         print("Tip: export SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to activate secure account authentication.")
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
-

@@ -105,6 +105,8 @@
   const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   });
+  // Shared by the browser API service layer; never expose a service-role key here.
+  window.__MFT_SUPABASE_CLIENT = client;
   document.body.classList.add('supabase-live');
   authScreen.classList.add('auth-live-v3');
   const title = card.querySelector('h2');
@@ -141,6 +143,18 @@
     return !data || data.id === ownId;
   }
   async function saveCloudProfile(user, details) {
+    if (window.PiZeroServices?.profile) {
+      await window.PiZeroServices.profile.updateProfile({
+        username: normalizeUsername(details.username),
+        display_name: details.displayName,
+        preferred_language: details.language || 'en',
+        ranking_opt_in: Boolean(details.rankingOptIn),
+        mobile_number: details.mobile || '',
+        onboarding: details.onboarding || {},
+        profile_completed: true
+      });
+      return;
+    }
     const username = normalizeUsername(details.username);
     const {error} = await client.from('profiles').upsert({
       id: user.id, username, display_name: details.displayName, ranking_opt_in: Boolean(details.rankingOptIn),
@@ -207,7 +221,7 @@
       const rankingOptIn = Boolean(safeForm.querySelector('#accountRankingOptIn').checked);
       const {data,error} = await client.auth.updateUser({data:{username,display_name:name,mobile_number:mobile,preferred_language:safeForm.querySelector('#accountLanguage').value,ranking_opt_in:rankingOptIn}});
       if (error) { alert(error.message); return; }
-      await saveCloudProfile(data.user, {username,displayName:name,language:safeForm.querySelector('#accountLanguage').value,rankingOptIn});
+      await saveCloudProfile(data.user, {username,displayName:name,mobile,language:safeForm.querySelector('#accountLanguage').value,rankingOptIn});
       mirrorUser(data.user);
       location.reload();
     });
@@ -322,7 +336,7 @@
     const {data,error} = await client.auth.updateUser({password:basics.password,data:{username:basics.username,display_name:basics.name,preferred_language:basics.language,mobile_number:basics.mobile,onboarding,ranking_opt_in:basics.rankingOptIn,mft_account_complete:true}});
     if (error) throw error;
     if (!data.user) throw new Error('Account setup did not finish. Please try again.');
-    await saveCloudProfile(data.user, {username:basics.username, displayName:basics.name, language:basics.language, rankingOptIn:basics.rankingOptIn});
+    await saveCloudProfile(data.user, {username:basics.username, displayName:basics.name, mobile:basics.mobile, language:basics.language, rankingOptIn:basics.rankingOptIn, onboarding});
     await client.auth.signOut();
     clearAppProfile(); flow = 'signin'; showEntry('Account created. Sign in with your email and password.', 'success');
   }
@@ -354,7 +368,16 @@
     const user = data.session?.user;
     if (!user) { clearAppProfile(); hideWorkspace(); showEntry(); return; }
     if (user.user_metadata?.mft_account_complete === true) {
-      mirrorUser(user); renderAccountProfile(user); authScreen.classList.add('hidden'); appShell.classList.remove('hidden'); return;
+      mirrorUser(user);
+      renderAccountProfile(user);
+      try {
+        const remoteIndices = await window.PiZeroServices?.indices?.getIndices();
+        const defaultIndex = remoteIndices?.[0]?.id;
+        await window.PiZeroServices?.predictions?.migrateLocalPredictions(user.id, defaultIndex);
+      } catch (_) {
+        // Keep the local cache available if the Phase 1 schema/API is not deployed yet.
+      }
+      authScreen.classList.add('hidden'); appShell.classList.remove('hidden'); return;
     }
     showBasics(user);
   }
@@ -419,4 +442,3 @@
     clearAppProfile(); hideWorkspace(); showEntry(); setStatus(error.message || 'Authentication service is unavailable.','error');
   });
 })();
-
