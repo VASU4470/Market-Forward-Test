@@ -105,7 +105,8 @@
     const actual = prediction.actual;
     const score = prediction.score;
     const detail = score?.detail || {};
-    const canScoreNow = !score && prediction.date === dateKey;
+    const scoreLabel = score ? (score.source === 'server' || score.rule_version ? 'Server scored' : 'Scored') : 'Score pending';
+    const canScoreNow = !score;
 
     historyDialog.innerHTML = `
       <div class="history-entry-card">
@@ -119,7 +120,7 @@
           <div><small>Day type</small><b>${escapeHtml(prediction.dayType || '—')}</b></div>
           <div><small>Support</small><b>${escapeHtml(prediction.support ?? '—')}</b></div>
           <div><small>Resistance</small><b>${escapeHtml(prediction.resistance ?? '—')}</b></div>
-          <div><small>Status</small><b>${score ? 'Scored' : 'Score pending'}</b></div>
+          <div><small>Status</small><b>${scoreLabel}</b></div>
         </div>
         ${actual ? `<div class="history-score-detail"><span class="section-kicker">ACTUAL OUTCOME</span><div class="history-detail-grid">
           <div><small>Direction</small><b>${escapeHtml(actual.bias || '—')}</b></div>
@@ -137,7 +138,7 @@
           <div><small>Resistance</small><b>${Math.round(detail.resistance || 0)}/17.5</b></div>
         </div></div>` : `<div class="history-score-detail"><div class="history-score-hero"><div><span class="section-kicker">SCORE PENDING</span><p class="muted">This forecast has not been scored yet.</p></div><span class="history-status pending">◷ Score pending</span></div></div>`}
         <div class="history-entry-actions">
-          ${canScoreNow ? '<button class="primary-btn" type="button" data-score-history-entry>SCORE THIS ENTRY <span>→</span></button>' : ''}
+          ${canScoreNow ? '<button class="primary-btn" type="button" data-score-history-entry>REVIEW / SCORE THIS ENTRY <span>→</span></button>' : ''}
           <button class="secondary-btn" type="button" data-close-history-entry>CLOSE</button>
         </div>
       </div>`;
@@ -145,6 +146,7 @@
     historyDialog.querySelector('.history-entry-close')?.addEventListener('click', () => historyDialog.close());
     historyDialog.querySelector('[data-close-history-entry]')?.addEventListener('click', () => historyDialog.close());
     historyDialog.querySelector('[data-score-history-entry]')?.addEventListener('click', () => {
+      resultSelection = {date: prediction.date, indexId: market.id};
       selectedIndexId = market.id;
       const mainSelector = document.getElementById('indexSelect');
       if (mainSelector) mainSelector.value = selectedIndexId;
@@ -231,7 +233,7 @@
     <div id="autoMarketGrid" class="auto-market-grid hidden"></div>
     <div class="auto-score-actions">
       <button id="fetchMarketResult" class="primary-btn compact-btn" type="button">CHECK MARKET RESULT <span>→</span></button>
-      <button id="manualResultToggle" class="secondary-btn" type="button">Manual fallback</button>
+      <button id="manualResultToggle" class="secondary-btn" type="button">Enter actual result</button>
     </div>
     <p id="autoMethodNote" class="auto-method-note">Automatic scoring uses fixed rules, not AI judgment.</p>
   `;
@@ -261,8 +263,9 @@
 
   function todaysPredictionMarkets() {
     dedupeLocalPredictions();
+    const targetDate = resultSelection?.date || dateKey;
     const predictionIds = new Set((activeState()?.predictions || [])
-      .filter(p => p.date === dateKey)
+      .filter(p => p.date === targetDate)
       .map(predictionIndexId));
     const available = indices.filter(item => predictionIds.has(item.id) || (predictionIds.has('local-nifty50') && item.code === 'NIFTY50'));
     return available.length ? available : indices;
@@ -314,7 +317,7 @@
     syncResultIndexSelector();
     clearMarketGrid();
     const market = selectedMarket();
-    const p = current();
+    const p = selectedResultPrediction();
 
     if (!p) {
       setState('pending', `No ${market.display_name} prediction locked`, 'Choose a market with a locked prediction, or return to Forward Test and record one first.');
@@ -326,7 +329,7 @@
 
     fetchBtn.disabled = false;
     if (p.score) {
-      const mode = p.actualSource?.mode === 'automatic' ? 'Automatically' : 'Manually';
+      const mode = p.score.source === 'server' || p.score.rule_version ? 'Server' : (p.actualSource?.mode === 'automatic' ? 'Automatically' : 'Manually');
       setState('success', `${mode} scored ${p.score.total}/100`, `${market.display_name} · ${p.bias} · ${p.opening} · ${p.dayType}`);
       fetchBtn.textContent = isAutomaticMarketSupported() ? 'REFRESH MARKET RESULT' : 'AUTOMATIC RESULT UNAVAILABLE';
       actualForm.hidden = true;
@@ -338,7 +341,7 @@
       fetchBtn.disabled = true;
       fetchBtn.textContent = 'AUTOMATIC RESULT UNAVAILABLE';
       actualForm.hidden = false;
-      manualBtn.textContent = 'Hide manual entry';
+      manualBtn.textContent = 'Hide actual result entry';
       methodNote.textContent = `Manual scoring selected for ${market.display_name}.`;
       return false;
     }
@@ -351,7 +354,7 @@
   async function fetchMarketResult() {
     syncResultIndexSelector();
     const market = selectedMarket();
-    const p = current();
+    const p = selectedResultPrediction();
     if (!p) {
       setState('pending', 'Lock a prediction first', `No ${market.display_name} prediction is available for today.`);
       return;
@@ -359,7 +362,7 @@
     if (!isAutomaticMarketSupported()) {
       setState('pending', `${market.display_name} uses manual scoring for now`, 'Enter the actual market outcome below. Automatic provider support for this index can be added separately.');
       actualForm.hidden = false;
-      manualBtn.textContent = 'Hide manual entry';
+      manualBtn.textContent = 'Hide actual result entry';
       return;
     }
 
@@ -382,7 +385,7 @@
         if (data.error === 'TOKEN_MISSING') {
           setState('error', 'Automatic data is not configured yet', 'The scoring workflow is ready, but the server still needs a read-only market-data token. Manual scoring remains available below.');
           actualForm.hidden = false;
-          manualBtn.textContent = 'Hide manual entry';
+          manualBtn.textContent = 'Hide actual result entry';
           return;
         }
         throw new Error(data.message || `Market-data request failed (${response.status}).`);
@@ -393,7 +396,7 @@
         const scored = await window.PiZeroServices.predictions.scorePrediction(p.cloudId);
         if (scored?.scoring_status === 'scored') {
           const detail = scored.score_details || {};
-          p.score = { total:Number(scored.score), detail:{ bias:detail.bias || 0, opening:detail.opening || 0, dayType:detail.day_type ?? detail.dayType ?? 0, support:detail.support || 0, resistance:detail.resistance || 0 }, rule_version:scored.scoring_rule_version };
+          p.score = { source:'server', total:Number(scored.score), detail:{ bias:detail.bias || 0, opening:detail.opening || 0, dayType:detail.day_type ?? detail.dayType ?? 0, support:detail.support || 0, resistance:detail.resistance || 0 }, rule_version:scored.scoring_rule_version };
         } else {
           p.score = null;
           setState('pending', 'Market session is not ready for server scoring', 'The server will score this locked prediction once the persisted market session is available.');
@@ -402,6 +405,7 @@
       } else {
         // Local scoring remains only for records that have not migrated to cloud storage.
         p.score = calculateScore(p, data.actual);
+        p.score.source = 'local';
       }
       p.actualSource = {
         mode: 'automatic',
@@ -417,9 +421,9 @@
       fetchBtn.textContent = 'REFRESH MARKET RESULT';
       renderHistory();
     } catch (error) {
-      setState('error', 'Could not fetch market data', error.message || 'Use the manual fallback or try again.');
+      setState('error', 'Could not fetch market data', error.message || 'Use Enter actual result or try again.');
       actualForm.hidden = false;
-      manualBtn.textContent = 'Hide manual entry';
+      manualBtn.textContent = 'Hide actual result entry';
     } finally {
       fetchBtn.disabled = false;
     }
@@ -427,6 +431,7 @@
 
   resultIndexSelect.addEventListener('change', () => {
     selectedIndexId = resultIndexSelect.value;
+    resultSelection = {date: resultSelection?.date || dateKey, indexId: selectedIndexId};
     const mainSelector = document.getElementById('indexSelect');
     if (mainSelector) mainSelector.value = selectedIndexId;
     renderAll();
@@ -435,13 +440,13 @@
 
   fetchBtn.addEventListener('click', fetchMarketResult);
   manualBtn.addEventListener('click', () => {
-    const p = current();
+    const p = selectedResultPrediction();
     if (!p) {
       showSelectedResultState();
       return;
     }
     actualForm.hidden = !actualForm.hidden;
-    manualBtn.textContent = actualForm.hidden ? 'Manual fallback' : 'Hide manual entry';
+    manualBtn.textContent = actualForm.hidden ? 'Enter actual result' : 'Hide actual result entry';
   });
 
   // After manual scoring, refresh the history and selected-market status.
@@ -456,7 +461,7 @@
     btn.addEventListener('click', () => {
       window.setTimeout(() => {
         syncResultIndexSelector();
-        if (!showSelectedResultState() && isAutomaticMarketSupported() && current()) fetchMarketResult();
+        if (!showSelectedResultState() && isAutomaticMarketSupported() && selectedResultPrediction()) fetchMarketResult();
       }, 120);
     });
   });

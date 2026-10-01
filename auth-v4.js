@@ -210,25 +210,44 @@
       <label class="field-label"><span>Mobile (unverified)</span><input id="accountMobile" type="tel" maxlength="24" value="${escapeHtml(meta.mobile_number || '')}" placeholder="Optional, include country code" /></label>
       <label class="field-label"><span>Preferred language</span><select id="accountLanguage"><option value="en">English</option><option value="ta">தமிழ்</option></select></label>
       <label class="field-label"><span class="checkbox-line"><input id="accountRankingOptIn" type="checkbox" ${meta.ranking_opt_in ? 'checked' : ''} /> Participate in the public ranking</span><small class="auth-helper-v3">Only your username and ranking information are public.</small></label>
-      <button class="primary-btn" type="submit">SAVE PERSONAL DETAILS</button>
+      <button class="primary-btn" type="submit">SAVE PERSONAL DETAILS</button><div id="accountSaveStatus" class="account-save-status" role="status" aria-live="polite"></div>
       <div class="account-security"><h3>Security</h3><button type="button" class="auth-text-btn" data-account-action="password">Change password</button><button type="button" class="auth-text-btn" data-account-action="email">Change email</button><button type="button" class="auth-text-btn" data-account-action="signout-all">Sign out all devices</button></div>
       <div class="kyc-note"><strong>KYC verification — Coming soon</strong><p>Mobile and PAN verification are not available yet. PAN is not collected.</p></div>
       <div class="account-summary"><h3>Market profile</h3><p>Interests: ${escapeHtml((details.roles || []).join(', ') || 'Not specified')}</p><p>Experience: ${escapeHtml(details.experience || 'Not specified')} · Capital range: ${escapeHtml(details.capital_range || 'Not specified')}</p><p>Broker: ${escapeHtml(details.broker || 'Not specified')}</p></div><div class="account-danger"><h3>Danger zone</h3><p>Permanently delete your account, profile, and local forward-test record.</p><button type="button" class="danger-btn" data-account-action="delete">DELETE ACCOUNT PERMANENTLY</button></div>`;
     safeForm.querySelector('#accountLanguage').value = meta.preferred_language || 'en';
     safeForm.addEventListener('submit', async event => {
       event.preventDefault();
+      const saveButton = safeForm.querySelector('button[type="submit"]');
+      const saveStatus = safeForm.querySelector('#accountSaveStatus');
+      const setSaveStatus = (message, kind = '') => {
+        saveStatus.textContent = message;
+        saveStatus.className = `account-save-status ${kind}`;
+      };
       const username = normalizeUsername(safeForm.querySelector('#accountUsername').value), name = safeForm.querySelector('#accountName').value.trim();
       const mobile = safeForm.querySelector('#accountMobile').value.trim();
-      if (!validUsername(username)) { alert('Choose a username with 3–24 lowercase letters, numbers, or underscores.'); return; }
-      if (!(await usernameAvailable(username, user.id))) { alert('That username is already taken. Choose another one.'); return; }
-      if (name.length < 2) { alert('Enter a display name of at least 2 characters.'); return; }
-      if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile.replace(/[\s()-]/g,''))) { alert('Include the mobile country code.'); return; }
+      if (!validUsername(username)) { setSaveStatus('Choose a username with 3–24 lowercase letters, numbers, or underscores.', 'error'); return; }
+      if (!(await usernameAvailable(username, user.id))) { setSaveStatus('That username is already taken. Choose another one.', 'error'); return; }
+      if (name.length < 2) { setSaveStatus('Enter a display name of at least 2 characters.', 'error'); return; }
+      if (mobile && !/^\+[1-9]\d{7,14}$/.test(mobile.replace(/[\s()-]/g,''))) { setSaveStatus('Include the mobile country code.', 'error'); return; }
       const rankingOptIn = Boolean(safeForm.querySelector('#accountRankingOptIn').checked);
-      const {data,error} = await client.auth.updateUser({data:{username,display_name:name,mobile_number:mobile,preferred_language:safeForm.querySelector('#accountLanguage').value,ranking_opt_in:rankingOptIn}});
-      if (error) { alert(error.message); return; }
-      await saveCloudProfile(data.user, {username,displayName:name,mobile,language:safeForm.querySelector('#accountLanguage').value,rankingOptIn});
-      mirrorUser(data.user);
-      location.reload();
+      saveButton.disabled = true;
+      saveButton.textContent = 'SAVING…';
+      setSaveStatus('Saving your personal details…');
+      try {
+        const {data,error} = await client.auth.updateUser({data:{username,display_name:name,mobile_number:mobile,preferred_language:safeForm.querySelector('#accountLanguage').value,ranking_opt_in:rankingOptIn}});
+        if (error) throw error;
+        await saveCloudProfile(data.user, {username,displayName:name,mobile,language:safeForm.querySelector('#accountLanguage').value,rankingOptIn});
+        mirrorUser(data.user);
+        user.user_metadata = data.user.user_metadata;
+        document.getElementById('profileNameHeading').textContent = name;
+        document.getElementById('profileDisplayName').textContent = name;
+        setSaveStatus('Personal details saved successfully.', 'success');
+      } catch (error) {
+        setSaveStatus(error.message || 'Could not save your personal details.', 'error');
+      } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'SAVE PERSONAL DETAILS';
+      }
     });
     safeForm.addEventListener('click', async event => {
       const action = event.target.closest('[data-account-action]')?.dataset.accountAction;

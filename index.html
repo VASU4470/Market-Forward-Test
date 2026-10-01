@@ -16,7 +16,7 @@
   </script>
   <link rel="manifest" href="manifest.webmanifest?v=2.8" />
   <link rel="icon" href="icon.svg?v=2.8" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=2.10" />
+  <link rel="stylesheet" href="styles.css?v=2.11" />
   <link rel="stylesheet" href="theme.css?v=2.8" />
   <link rel="stylesheet" href="brand.css?v=2.8" />
   <link rel="stylesheet" href="accessibility.css?v=1" />
@@ -196,6 +196,7 @@
           <div id="scorePanel" class="score-card hidden">
             <div class="score-ring"><span id="scoreValue">0</span><small>/100</small></div>
             <div id="scoreInsight" class="score-insight"></div>
+            <div id="scoreSource" class="score-source" role="status"></div>
             <div id="scoreBreakdown" class="score-breakdown"></div>
           </div>
           <form id="actualForm" class="panel form-card">
@@ -229,6 +230,17 @@
           <div class="page-heading"><div><span class="section-kicker">PERFORMANCE</span><h1>Market Reading Score</h1><p class="muted">See what you read well and where your process needs work.</p></div></div>
           <div class="profile-score panel"><div><span class="big-score" id="avgScore">—</span><small>/100</small></div><p id="profileSessions">No scored sessions yet</p></div>
           <div id="skillBars" class="panel"></div>
+          <section class="panel server-dashboard-panel" aria-labelledby="serverDashboardTitle">
+            <div class="panel-head"><div><span class="section-kicker">SERVER RECORD</span><h2 id="serverDashboardTitle">Your verified statistics</h2></div><button id="refreshServerDashboard" class="secondary-btn compact-btn" type="button">REFRESH</button></div>
+            <p id="serverDashboardStatus" class="dashboard-status" role="status" aria-live="polite">Open this page to load your server-authoritative statistics.</p>
+            <div id="serverStatsGrid" class="server-stats-grid"></div>
+            <div class="dashboard-subsection"><div class="dashboard-subhead"><h3>Test progress</h3><span class="panel-note">Protected to your account</span></div><div id="serverProgress"></div></div>
+          </section>
+          <section class="panel ranking-panel" aria-labelledby="rankingTitle">
+            <div class="panel-head"><div><span class="section-kicker">COMMUNITY</span><h2 id="rankingTitle">Public ranking</h2></div></div>
+            <p class="dashboard-status">Only users who explicitly opt in appear. Email, phone, and private profile details are never shown.</p>
+            <div id="rankingList"></div>
+          </section>
         </section>
 
         <section id="profile" class="view">
@@ -274,7 +286,7 @@
   <script src="services/statistics-service.js?v=1"></script>
   <script src="services/ranking-service.js?v=1"></script>
   <script src="services/test-period-service.js?v=1"></script>
-  <script src="app.js?v=2.4"></script>
+  <script src="app.js?v=2.5"></script>
   <script src="lock-fix.js?v=1"></script>
 </body>
 </html>

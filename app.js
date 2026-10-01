@@ -63,11 +63,21 @@ let draft = { bias:null, opening:null, dayType:null, support:'', resistance:'' }
 let pendingPrediction = null;
 let indices = [];
 let selectedIndexId = 'local-nifty50';
+let resultSelection = null;
+let serverDashboardState = {status:'idle', statistics:null, progress:null, ranking:[]};
 
 function saveRoot(){ localStorage.setItem(ROOT_KEY, JSON.stringify(root)); }
 function activeProfile(){ return root.activeProfile ? root.profiles[root.activeProfile] : null; }
 function activeState(){ return activeProfile()?.state || null; }
 function current(){ return activeState()?.predictions.find(p => p.date === dateKey && (p.indexId || 'local-nifty50') === selectedIndexId); }
+function selectedResultPrediction(){
+  const state = activeState();
+  if (!state) return null;
+  if (resultSelection) {
+    return state.predictions.find(p => p.date === resultSelection.date && (p.indexId || 'local-nifty50') === resultSelection.indexId) || null;
+  }
+  return current();
+}
 function selectedIndex(){ return indices.find(item => item.id === selectedIndexId) || indices[0] || {id:'local-nifty50', display_name:'NIFTY 50'}; }
 
 function profileIdFromEmail(email){
@@ -364,7 +374,7 @@ $('confirmLock').onclick = async () => {
 
 $('actualForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const p = current();
+  const p = selectedResultPrediction();
   if (!p) { alert('Lock today\'s prediction first.'); return; }
   const actual = {
     bias:$('actualBias').value,
@@ -382,7 +392,7 @@ $('actualForm').addEventListener('submit', async e => {
       const scored = await window.PiZeroServices.predictions.scorePrediction(p.cloudId);
       if (scored?.scoring_status === 'scored') {
         const detail = scored.score_details || {};
-        p.score = { total:Number(scored.score), detail:{ bias:detail.bias || 0, opening:detail.opening || 0, dayType:detail.day_type ?? detail.dayType ?? 0, support:detail.support || 0, resistance:detail.resistance || 0 }, rule_version:scored.scoring_rule_version };
+        p.score = { source:'server', total:Number(scored.score), detail:{ bias:detail.bias || 0, opening:detail.opening || 0, dayType:detail.day_type ?? detail.dayType ?? 0, support:detail.support || 0, resistance:detail.resistance || 0 }, rule_version:scored.scoring_rule_version };
       } else {
         p.score = null;
         alert('The server is waiting for the persisted market session before scoring this prediction.');
@@ -394,7 +404,9 @@ $('actualForm').addEventListener('submit', async e => {
   } else {
     // Keep local scoring only for the temporary pre-cloud migration fallback.
     p.score = calculateScore(p, actual);
+    p.score.source = 'local';
   }
+  p.actualSource = {mode:'manual', enteredAt:new Date().toISOString()};
   saveRoot(); renderAll();
 });
 
@@ -447,10 +459,16 @@ function renderResult(){
     const d=p.score.detail;
     const metrics=[['Bias',d.bias,25],['Open',d.opening,20],['Day',d.dayType,20],['Support',d.support,17.5],['Resistance',d.resistance,17.5]];
     $('scoreBreakdown').innerHTML=metrics.map(([n,v,max])=>`<div class="metric"><b>${Math.round(v)}/${max}</b><small>${n}</small></div>`).join('');
+    const source = p.score.source === 'server' || p.score.rule_version ? 'Server scored' : 'Local migration fallback';
+    $('scoreSource').textContent = `${source}${p.score.rule_version ? ` · ${escapeHtml(p.score.rule_version)}` : ''}`;
+    $('scoreSource').className = `score-source ${p.score.source === 'server' || p.score.rule_version ? 'server' : 'local'}`;
     $('scoreInsight').textContent = p.score.total>=80 ? 'Excellent market read today.' : p.score.total>=60 ? 'Good read, with room to improve.' : 'Today exposed useful gaps in your market read.';
     $('actualBias').value=p.actual.bias; $('actualOpening').value=p.actual.opening; $('actualDayType').value=p.actual.dayType;
     $('actualLow').value=p.actual.low; $('actualHigh').value=p.actual.high;
-  } else panel.classList.add('hidden');
+  } else {
+    panel.classList.add('hidden');
+    $('scoreSource').textContent = '';
+  }
 }
 
 function filteredHistory(){
@@ -500,6 +518,79 @@ function renderScore(){
     const pct=Math.round(scored.reduce((s,p)=>s+(p.score.detail[key]/max)*100,0)/scored.length);
     return `<div class="skill"><div class="skill-head"><span>${label}</span><b>${pct}%</b></div><div class="bar"><span style="width:${pct}%"></span></div></div>`;
   }).join('');
+}
+
+function renderServerDashboard(){
+  const statsGrid = $('serverStatsGrid');
+  const progress = $('serverProgress');
+  const ranking = $('rankingList');
+  const status = $('serverDashboardStatus');
+  if (!statsGrid || !progress || !ranking || !status) return;
+
+  if (serverDashboardState.status === 'loading') {
+    status.textContent = 'Loading your protected server statistics…';
+    statsGrid.innerHTML = '<div class="dashboard-loading">Reading your scored predictions from Supabase.</div>';
+    progress.innerHTML = '<div class="dashboard-loading">Loading forward-test progress…</div>';
+    ranking.innerHTML = '<div class="dashboard-loading">Loading opt-in ranking…</div>';
+    return;
+  }
+  if (serverDashboardState.status === 'error') {
+    status.textContent = serverDashboardState.message || 'Server statistics are temporarily unavailable.';
+    statsGrid.innerHTML = '<div class="dashboard-empty">Refresh the page or sign in again to load protected statistics.</div>';
+    progress.innerHTML = '<div class="dashboard-empty">Progress is unavailable right now.</div>';
+    ranking.innerHTML = '<div class="dashboard-empty">Ranking is unavailable right now.</div>';
+    return;
+  }
+  if (serverDashboardState.status !== 'ready') {
+    status.textContent = 'Open this page to load your server-authoritative statistics.';
+    statsGrid.innerHTML = '<div class="dashboard-empty">Your cloud statistics will appear here after loading.</div>';
+    progress.innerHTML = '<div class="dashboard-empty">Your active and completed tests will appear here.</div>';
+    ranking.innerHTML = '<div class="dashboard-empty">Only users who opt in and meet the ranking rule appear here.</div>';
+    return;
+  }
+
+  const s = serverDashboardState.statistics || {};
+  const value = (v, suffix = '') => v === null || v === undefined ? '—' : `${v}${suffix}`;
+  statsGrid.innerHTML = [
+    ['Total predictions', value(s.total_predictions)],
+    ['Scored predictions', value(s.completed_predictions)],
+    ['Correct predictions', value(s.correct_predictions)],
+    ['Accuracy', value(s.accuracy_percentage, '%')],
+    ['Average score', value(s.average_score, '/100')]
+  ].map(([label, v]) => `<div class="server-stat"><b>${escapeHtml(v)}</b><small>${escapeHtml(label)}</small></div>`).join('');
+
+  const active = serverDashboardState.progress?.active_test_period;
+  const completed = serverDashboardState.progress?.completed_test_periods || [];
+  if (active) {
+    const done = active.completed_sessions ?? 0;
+    const target = active.duration_sessions ?? '—';
+    progress.innerHTML = `<div class="progress-summary"><div><span class="section-kicker">ACTIVE TEST</span><strong>${done} / ${target} sessions</strong><small>${escapeHtml(active.status || 'active')} · starts ${escapeHtml(active.start_date || '—')}</small></div><span class="panel-note">${escapeHtml(String(active.duration_sessions || '—'))} sessions</span></div><div class="server-progress-bar"><span style="width:${target && target !== '—' ? Math.min(100, Math.round(done / target * 100)) : 0}%"></span></div>`;
+  } else {
+    progress.innerHTML = `<div class="dashboard-empty">No active test period. Completed periods: ${completed.length}.</div>`;
+  }
+
+  if (!serverDashboardState.ranking.length) {
+    ranking.innerHTML = '<div class="dashboard-empty">No public ranking entries are available. Ranking requires explicit opt-in and at least five scored predictions.</div>';
+  } else {
+    ranking.innerHTML = `<div class="ranking-head"><span>Username</span><span>Average · Accuracy</span></div>` + serverDashboardState.ranking.map(row => `<div class="ranking-row"><b>${escapeHtml(row.username || 'Anonymous')}</b><span>${escapeHtml(value(row.average_score, '/100'))} · ${escapeHtml(value(row.accuracy_percentage, '%'))}</span></div>`).join('');
+  }
+}
+
+async function refreshServerDashboard(){
+  if (!window.PiZeroServices?.statistics || !window.PiZeroServices?.ranking) return;
+  serverDashboardState = {status:'loading', statistics:null, progress:null, ranking:[]};
+  renderServerDashboard();
+  try {
+    const [statistics, progress, ranking] = await Promise.all([
+      window.PiZeroServices.statistics.getMyStatistics(),
+      window.PiZeroServices.statistics.getMyTestProgress(),
+      window.PiZeroServices.ranking.getRanking()
+    ]);
+    serverDashboardState = {status:'ready', statistics, progress, ranking};
+  } catch (error) {
+    serverDashboardState = {status:'error', message:error.message, statistics:null, progress:null, ranking:[]};
+  }
+  renderServerDashboard();
 }
 
 function renderProfile(){
@@ -563,7 +654,13 @@ function navigate(target){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>navigate(btn.dataset.target)));
+document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>{
+  const target = btn.dataset.target;
+  if (target !== 'result') resultSelection = null;
+  navigate(target);
+  if (target === 'score') refreshServerDashboard();
+}));
+$('refreshServerDashboard')?.addEventListener('click', refreshServerDashboard);
 
 applyTheme(currentTheme());
 
