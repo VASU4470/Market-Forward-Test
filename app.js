@@ -459,7 +459,7 @@ function renderResult(){
     const d=p.score.detail;
     const metrics=[['Bias',d.bias,25],['Open',d.opening,20],['Day',d.dayType,20],['Support',d.support,17.5],['Resistance',d.resistance,17.5]];
     $('scoreBreakdown').innerHTML=metrics.map(([n,v,max])=>`<div class="metric"><b>${Math.round(v)}/${max}</b><small>${n}</small></div>`).join('');
-    const source = p.score.source === 'server' || p.score.rule_version ? 'Server scored' : 'Local migration fallback';
+    const source = p.score.source === 'server' || p.score.rule_version ? 'Server scored' : 'Local migration fallback · not included in server statistics';
     $('scoreSource').textContent = `${source}${p.score.rule_version ? ` · ${escapeHtml(p.score.rule_version)}` : ''}`;
     $('scoreSource').className = `score-source ${p.score.source === 'server' || p.score.rule_version ? 'server' : 'local'}`;
     $('scoreInsight').textContent = p.score.total>=80 ? 'Excellent market read today.' : p.score.total>=60 ? 'Good read, with room to improve.' : 'Today exposed useful gaps in your market read.';
@@ -550,6 +550,10 @@ function renderServerDashboard(){
   }
 
   const s = serverDashboardState.statistics || {};
+  const localFallbackCount = (activeState()?.predictions || []).filter(p => p.score && !(p.score.source === 'server' || p.score.rule_version)).length;
+  status.textContent = localFallbackCount
+    ? `Loaded from Supabase. ${localFallbackCount} local fallback score${localFallbackCount === 1 ? '' : 's'} are not included in verified statistics.`
+    : 'Loaded from Supabase · server-scored predictions only.';
   const value = (v, suffix = '') => v === null || v === undefined ? '—' : `${v}${suffix}`;
   statsGrid.innerHTML = [
     ['Total predictions', value(s.total_predictions)],

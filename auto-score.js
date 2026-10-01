@@ -329,8 +329,10 @@
 
     fetchBtn.disabled = false;
     if (p.score) {
-      const mode = p.score.source === 'server' || p.score.rule_version ? 'Server' : (p.actualSource?.mode === 'automatic' ? 'Automatically' : 'Manually');
-      setState('success', `${mode} scored ${p.score.total}/100`, `${market.display_name} · ${p.bias} · ${p.opening} · ${p.dayType}`);
+      const isServerScore = p.score.source === 'server' || p.score.rule_version;
+      const mode = isServerScore ? 'Server' : (p.actualSource?.mode === 'automatic' ? 'Automatically' : 'Manually');
+      const note = isServerScore ? '' : ' · local fallback; not included in server statistics';
+      setState('success', `${mode} scored ${p.score.total}/100`, `${market.display_name} · ${p.bias} · ${p.opening} · ${p.dayType}${note}`);
       fetchBtn.textContent = isAutomaticMarketSupported() ? 'REFRESH MARKET RESULT' : 'AUTOMATIC RESULT UNAVAILABLE';
       actualForm.hidden = true;
       return true;
