@@ -52,6 +52,115 @@
     });
   }
 
+  function historyKey(prediction) {
+    return `${prediction.date || ''}::${predictionIndexId(prediction)}`;
+  }
+
+  const historyStyle = document.createElement('style');
+  historyStyle.textContent = `
+    .history-item[data-history-key]{cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+    .history-item[data-history-key]:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--primary) 35%,var(--border));box-shadow:0 10px 26px rgba(28,20,40,.08)}
+    .history-item[data-history-key]:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}
+    .history-status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 9px;font-size:.72rem;font-weight:800;white-space:nowrap}
+    .history-status.pending{background:var(--amber-soft);color:var(--amber)}
+    .history-status.scored{background:var(--primary-soft);color:var(--primary-strong)}
+    .history-entry-dialog{border:0;padding:0;background:transparent;max-width:min(720px,calc(100vw - 24px));width:100%}
+    .history-entry-dialog::backdrop{background:rgba(20,15,25,.48);backdrop-filter:blur(4px)}
+    .history-entry-card{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:22px;padding:22px;box-shadow:0 28px 80px rgba(23,16,31,.22)}
+    .history-entry-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+    .history-entry-head h2{margin:6px 0 3px;font-size:1.35rem}.history-entry-head p{margin:0;color:var(--muted)}
+    .history-entry-close{border:1px solid var(--border);background:var(--field);color:var(--text);width:36px;height:36px;border-radius:50%;font-size:1.15rem;cursor:pointer}
+    .history-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0}
+    .history-detail-grid>div{background:var(--field);border:1px solid var(--border-soft);border-radius:12px;padding:11px}
+    .history-detail-grid small,.history-detail-grid b{display:block}.history-detail-grid small{font-size:.72rem;color:var(--muted);margin-bottom:4px}.history-detail-grid b{font-size:.86rem}
+    .history-score-detail{border-top:1px solid var(--border-soft);padding-top:15px;margin-top:15px}
+    .history-score-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.history-score-hero strong{font-size:2rem;color:var(--primary-strong)}
+    .history-entry-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;flex-wrap:wrap}
+    @media(max-width:620px){.history-detail-grid{grid-template-columns:repeat(2,1fr)}.history-entry-card{padding:17px}.history-entry-actions>*{width:100%}}
+  `;
+  document.head.appendChild(historyStyle);
+
+  const historyDialog = document.createElement('dialog');
+  historyDialog.className = 'history-entry-dialog';
+  historyDialog.id = 'historyEntryDialog';
+  document.body.appendChild(historyDialog);
+
+  function formatLockedAt(value) {
+    if (!value) return 'Not available';
+    try {
+      return new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true, timeZone: INDIA_TZ
+      }).format(new Date(value)) + ' IST';
+    } catch (_) {
+      return 'Not available';
+    }
+  }
+
+  function openHistoryEntry(prediction) {
+    if (!prediction) return;
+    const market = indexForPrediction(prediction);
+    const dateObj = new Date(`${prediction.date}T12:00:00+05:30`);
+    const date = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: INDIA_TZ }).format(dateObj);
+    const actual = prediction.actual;
+    const score = prediction.score;
+    const detail = score?.detail || {};
+    const canScoreNow = !score && prediction.date === dateKey;
+
+    historyDialog.innerHTML = `
+      <div class="history-entry-card">
+        <div class="history-entry-head">
+          <div><span class="section-kicker">LOCKED MARKET VIEW</span><h2>${escapeHtml(market.display_name)} · ${date}</h2><p>Locked ${escapeHtml(formatLockedAt(prediction.lockedAt))}</p></div>
+          <button class="history-entry-close" type="button" aria-label="Close history details">×</button>
+        </div>
+        <div class="history-detail-grid">
+          <div><small>Bias</small><b>${escapeHtml(prediction.bias || '—')}</b></div>
+          <div><small>Opening</small><b>${escapeHtml(prediction.opening || '—')}</b></div>
+          <div><small>Day type</small><b>${escapeHtml(prediction.dayType || '—')}</b></div>
+          <div><small>Support</small><b>${escapeHtml(prediction.support ?? '—')}</b></div>
+          <div><small>Resistance</small><b>${escapeHtml(prediction.resistance ?? '—')}</b></div>
+          <div><small>Status</small><b>${score ? 'Scored' : 'Score pending'}</b></div>
+        </div>
+        ${actual ? `<div class="history-score-detail"><span class="section-kicker">ACTUAL OUTCOME</span><div class="history-detail-grid">
+          <div><small>Direction</small><b>${escapeHtml(actual.bias || '—')}</b></div>
+          <div><small>Opening</small><b>${escapeHtml(actual.opening || '—')}</b></div>
+          <div><small>Day type</small><b>${escapeHtml(actual.dayType || '—')}</b></div>
+          <div><small>Low</small><b>${escapeHtml(actual.low ?? '—')}</b></div>
+          <div><small>High</small><b>${escapeHtml(actual.high ?? '—')}</b></div>
+          <div><small>Source</small><b>${escapeHtml(prediction.actualSource?.mode === 'automatic' ? 'Automatic' : 'Manual')}</b></div>
+        </div></div>` : ''}
+        ${score ? `<div class="history-score-detail"><div class="history-score-hero"><div><span class="section-kicker">SCORE</span><p class="muted">Breakdown of this locked forecast.</p></div><strong>${score.total}/100</strong></div><div class="history-detail-grid">
+          <div><small>Bias</small><b>${Math.round(detail.bias || 0)}/25</b></div>
+          <div><small>Opening</small><b>${Math.round(detail.opening || 0)}/20</b></div>
+          <div><small>Day type</small><b>${Math.round(detail.dayType || 0)}/20</b></div>
+          <div><small>Support</small><b>${Math.round(detail.support || 0)}/17.5</b></div>
+          <div><small>Resistance</small><b>${Math.round(detail.resistance || 0)}/17.5</b></div>
+        </div></div>` : `<div class="history-score-detail"><div class="history-score-hero"><div><span class="section-kicker">SCORE PENDING</span><p class="muted">This forecast has not been scored yet.</p></div><span class="history-status pending">◷ Score pending</span></div></div>`}
+        <div class="history-entry-actions">
+          ${canScoreNow ? '<button class="primary-btn" type="button" data-score-history-entry>SCORE THIS ENTRY <span>→</span></button>' : ''}
+          <button class="secondary-btn" type="button" data-close-history-entry>CLOSE</button>
+        </div>
+      </div>`;
+
+    historyDialog.querySelector('.history-entry-close')?.addEventListener('click', () => historyDialog.close());
+    historyDialog.querySelector('[data-close-history-entry]')?.addEventListener('click', () => historyDialog.close());
+    historyDialog.querySelector('[data-score-history-entry]')?.addEventListener('click', () => {
+      selectedIndexId = market.id;
+      const mainSelector = document.getElementById('indexSelect');
+      if (mainSelector) mainSelector.value = selectedIndexId;
+      historyDialog.close();
+      renderAll();
+      navigate('result');
+      window.setTimeout(showSelectedResultState, 60);
+    });
+
+    if (!historyDialog.open) historyDialog.showModal();
+  }
+
+  historyDialog.addEventListener('click', event => {
+    if (event.target === historyDialog) historyDialog.close();
+  });
+
   // Replace the old history filtering/rendering so one date+index prediction appears once.
   filteredHistory = function () {
     const items = uniqueHistoryItems();
@@ -77,12 +186,30 @@
       const dateObj = new Date(`${p.date}T12:00:00+05:30`);
       const date = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: INDIA_TZ }).format(dateObj);
       const market = indexForPrediction(p);
-      return `<div class="history-item">
+      const encodedKey = encodeURIComponent(historyKey(p));
+      return `<div class="history-item" data-history-key="${encodedKey}" role="button" tabindex="0" aria-label="Open ${escapeHtml(market.display_name)} prediction details for ${date}">
         <div><div class="date">${date} · ${escapeHtml(market.display_name)}</div><div class="meta">${escapeHtml(p.bias)} · ${escapeHtml(p.opening)} · ${escapeHtml(p.dayType)}</div></div>
-        <div class="history-score">${p.score ? p.score.total : '—'}</div>
+        <div>${p.score ? `<span class="history-status scored">${p.score.total}/100</span>` : '<span class="history-status pending">◷ Score pending</span>'}</div>
       </div>`;
     }).join('');
   };
+
+  const historyList = document.getElementById('historyList');
+  function activateHistoryRow(target) {
+    const row = target.closest?.('[data-history-key]');
+    if (!row) return;
+    const key = decodeURIComponent(row.dataset.historyKey || '');
+    const prediction = uniqueHistoryItems().find(item => historyKey(item) === key);
+    openHistoryEntry(prediction);
+  }
+  historyList?.addEventListener('click', event => activateHistoryRow(event.target));
+  historyList?.addEventListener('keydown', event => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    const row = event.target.closest?.('[data-history-key]');
+    if (!row) return;
+    event.preventDefault();
+    activateHistoryRow(row);
+  });
 
   dedupeLocalPredictions();
   renderHistory();
