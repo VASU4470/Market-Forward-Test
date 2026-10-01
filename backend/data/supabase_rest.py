@@ -8,12 +8,16 @@ from ..errors import ApiError
 
 
 def _request(method, table, token, query=None, payload=None, prefer=None):
-    base = f"{supabase_url()}/rest/v1/{table}"
+    project_url = supabase_url()
+    publishable_key = supabase_publishable_key()
+    if not project_url or not publishable_key:
+        raise ApiError(503, "SUPABASE_NOT_CONFIGURED", "Supabase is not configured on the server.")
+    base = f"{project_url}/rest/v1/{table}"
     if query:
         base += "?" + urllib.parse.urlencode(query, doseq=True)
     effective_token = token or supabase_publishable_key()
     headers = {
-        "apikey": supabase_publishable_key(),
+        "apikey": publishable_key,
         "Authorization": f"Bearer {effective_token}",
         "Accept": "application/json",
     }

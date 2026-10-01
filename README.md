@@ -1,4 +1,4 @@
-# PiZero — UI update V2.8
+# PiZero — UI update V2.9
 
 A mobile-first PWA prototype for Indian market traders.
 
@@ -9,6 +9,9 @@ A mobile-first PWA prototype for Indian market traders.
 4. After the market closes, fetch the completed Nifty session automatically.
 5. Generate an objective score.
 6. Review personal history and skill profile.
+
+## User-controlled forward tests
+The Forward Test page lets each browser profile choose a start date (today or later) and a target from 1 to 365 market sessions; the default remains 30. A session counts once per date when at least one prediction is locked during the test. Progress and test records are stored with that profile's local browser data. Starting another test keeps earlier predictions and the earlier test record; an active test is marked stopped after confirmation. Test settings are not yet synchronized across devices.
 
 ## Display preferences
 - PiZero logo on sign-in, desktop sidebar and mobile header, plus a matching browser/app icon.
