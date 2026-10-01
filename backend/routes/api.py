@@ -3,9 +3,14 @@ import urllib.parse
 
 from ..auth import require_user
 from ..errors import ApiError, error_payload
+from ..services.account import delete_account
 from ..services.indices import get_indices
 from ..services.predictions import create_prediction, get_my_predictions
 from ..services.profile import get_profile, update_profile
+from ..services.ranking import get_ranking
+from ..services.scoring import score_prediction
+from ..services.statistics import get_my_score_history, get_my_statistics, get_my_test_progress
+from ..services.test_periods import create_test_period, get_my_test_periods, update_test_period
 
 
 def parse_body(handler):
@@ -38,6 +43,26 @@ def dispatch(handler, method, path):
         return 201, {"prediction": create_prediction(user, parse_body(handler))}
     if path == "/api/v1/predictions/me" and method == "GET":
         return 200, {"predictions": get_my_predictions(user, query_params(handler))}
+    if path.startswith("/api/v1/predictions/") and path.endswith("/score") and method == "POST":
+        prediction_id = path[len("/api/v1/predictions/"):-len("/score")].strip("/")
+        return 200, {"prediction": score_prediction(user, prediction_id)}
+    if path == "/api/v1/statistics" and method == "GET":
+        return 200, {"statistics": get_my_statistics(user)}
+    if path == "/api/v1/score-history" and method == "GET":
+        return 200, {"history": get_my_score_history(user)}
+    if path == "/api/v1/test-progress" and method == "GET":
+        return 200, get_my_test_progress(user)
+    if path == "/api/v1/test-periods" and method == "GET":
+        return 200, {"test_periods": get_my_test_periods(user)}
+    if path == "/api/v1/test-periods" and method == "POST":
+        return 201, {"test_period": create_test_period(user, parse_body(handler))}
+    if path.startswith("/api/v1/test-periods/") and method == "PATCH":
+        period_id = path[len("/api/v1/test-periods/"):].strip("/")
+        return 200, {"test_period": update_test_period(user, period_id, parse_body(handler))}
+    if path == "/api/v1/ranking" and method == "GET":
+        return 200, {"ranking": get_ranking(user)}
+    if path == "/api/v1/account/delete" and method == "POST":
+        return 200, delete_account(user, parse_body(handler))
     raise ApiError(404, "NOT_FOUND", "API endpoint not found.")
 
 

@@ -62,3 +62,39 @@ def upsert(table, token, payload, on_conflict, returning=True):
 def update(table, token, query, payload, returning=True):
     prefer = "return=representation" if returning else "return=minimal"
     return _request("PATCH", table, token, query=query, payload=payload, prefer=prefer)
+
+
+def rpc(function_name, token, payload=None):
+    project_url = supabase_url()
+    publishable_key = supabase_publishable_key()
+    if not project_url or not publishable_key:
+        raise ApiError(503, "SUPABASE_NOT_CONFIGURED", "Supabase is not configured on the server.")
+    base = f"{project_url}/rest/v1/rpc/{urllib.parse.quote(function_name, safe='')}"
+    effective_token = token or publishable_key
+    headers = {
+        "apikey": publishable_key,
+        "Authorization": f"Bearer {effective_token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    request = urllib.request.Request(
+        base,
+        data=json.dumps(payload or {}).encode("utf-8"),
+        method="POST",
+        headers=headers,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            raw = response.read()
+            return json.loads(raw.decode("utf-8")) if raw else None
+    except urllib.error.HTTPError as exc:
+        detail = exc.read(2000).decode("utf-8", "ignore")
+        if exc.code in (401, 403):
+            raise ApiError(403, "DATA_FORBIDDEN", "Supabase denied access to this operation.")
+        if exc.code == 404:
+            raise ApiError(503, "FUNCTION_NOT_CONFIGURED", "The required Supabase function is not available yet.")
+        if exc.code == 409:
+            raise ApiError(409, "DATA_CONFLICT", "This operation conflicts with existing account data.")
+        raise ApiError(502, "DATA_PROVIDER_ERROR", f"Supabase operation failed ({exc.code}).")
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        raise ApiError(502, "DATA_PROVIDER_UNAVAILABLE", "Supabase data is temporarily unavailable.")

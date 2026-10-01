@@ -2,6 +2,7 @@
   const root = window.PiZeroServices = window.PiZeroServices || {};
   root.predictions = {
     createPrediction: async prediction => (await root.api.request('/api/v1/predictions', { method: 'POST', body: prediction })).prediction,
+    scorePrediction: async predictionId => (await root.api.request(`/api/v1/predictions/${encodeURIComponent(predictionId)}/score`, { method: 'POST', body: {} })).prediction,
     getMyPredictions: async (indexId = '') => {
       const suffix = indexId ? `?index_id=${encodeURIComponent(indexId)}` : '';
       return (await root.api.request(`/api/v1/predictions/me${suffix}`)).predictions || [];
@@ -16,7 +17,7 @@
       let migrated = 0;
       for (const prediction of predictions) {
         try {
-          await this.createPrediction({
+          const created = await this.createPrediction({
             index_id: prediction.indexId || indexId,
             trading_date: prediction.date,
             bias: prediction.bias,
@@ -25,12 +26,15 @@
             support: Number(prediction.support),
             resistance: Number(prediction.resistance)
           });
+          prediction.cloudId = created?.id || prediction.cloudId || null;
+          prediction.cloudSync = 'synced';
           migrated += 1;
         } catch (error) {
           // A duplicate locked prediction is safe to treat as already migrated.
           if (![400, 409].includes(error.status)) throw error;
         }
       }
+      if (profile?.state) localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
       localStorage.setItem(key, 'complete');
       return { migrated, skipped: false };
     }

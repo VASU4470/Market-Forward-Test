@@ -78,13 +78,19 @@ python3 server.py
 The app will explain that automatic market data is not configured and reveal the manual fallback.
 
 ## Current data limitation
-Until cloud profile storage is added, prediction history is still mirrored into browser `localStorage` after authentication. Email verification confirms identity, but the next backend step is moving predictions/history into Supabase PostgreSQL with Row Level Security.
+Cloud prediction storage is now the authoritative path for authenticated users. Browser `localStorage` remains as a temporary migration/cache fallback so existing forward-test records are not lost during rollout.
 
 ## Phase 1 cloud data layer
 
 Phase 1 adds a reusable authenticated API for profiles, data-driven indexes, and locked predictions. Before deploying the Phase 1 code, run `supabase_phase1_schema.sql` in the Supabase SQL Editor. The migration is designed to preserve existing profile rows and can be run after `supabase_profile_schema.sql`.
 
-The browser calls `/api/v1/indices`, `/api/v1/profile`, and `/api/v1/predictions`. Protected endpoints require the Supabase access token; the server derives the user ID from that token and ignores any browser-supplied user ID. Local prediction data remains available as a temporary migration fallback until cloud storage is confirmed.
+The browser calls `/api/v1/indices`, `/api/v1/profile`, and `/api/v1/predictions`. Protected endpoints require the Supabase access token; the server derives the user ID from that token and ignores any browser-supplied user ID. Local prediction data remains available as a temporary migration fallback during rollout.
+
+## Phase 2 server-authoritative scoring
+
+Phase 2 adds `supabase_phase2_schema.sql`. Run it only after reviewing the existing Phase 1 tables. It adds user-owned `test_periods` (1–365 sessions), immutable prediction locking, score fields, an atomic `score_prediction` RPC, protected statistics APIs, and an opt-in-only ranking RPC. The service-role key is used only by the protected account-deletion operation; normal data access uses the authenticated user's token.
+
+Final scores are produced only when a persisted `market_sessions` row exists for the prediction's index and trading date. The scoring rule is versioned as `p2-v1`; a score is counted as correct for statistics when its total is at least 60/100. Ranking requires explicit opt-in and at least five server-scored predictions, and returns only username and aggregate performance fields.
 
 ## What this version intentionally does NOT include
 - Trading execution

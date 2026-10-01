@@ -389,7 +389,20 @@
       }
 
       p.actual = data.actual;
-      p.score = calculateScore(p, data.actual);
+      if (p.cloudId && window.PiZeroServices?.predictions?.scorePrediction) {
+        const scored = await window.PiZeroServices.predictions.scorePrediction(p.cloudId);
+        if (scored?.scoring_status === 'scored') {
+          const detail = scored.score_details || {};
+          p.score = { total:Number(scored.score), detail:{ bias:detail.bias || 0, opening:detail.opening || 0, dayType:detail.day_type ?? detail.dayType ?? 0, support:detail.support || 0, resistance:detail.resistance || 0 }, rule_version:scored.scoring_rule_version };
+        } else {
+          p.score = null;
+          setState('pending', 'Market session is not ready for server scoring', 'The server will score this locked prediction once the persisted market session is available.');
+          return;
+        }
+      } else {
+        // Local scoring remains only for records that have not migrated to cloud storage.
+        p.score = calculateScore(p, data.actual);
+      }
       p.actualSource = {
         mode: 'automatic',
         provider: data.provider,

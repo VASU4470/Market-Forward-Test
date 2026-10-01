@@ -249,35 +249,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path != "/api/account/delete":
             self.send_json(404, {"error": "Not found"})
             return
-        supabase_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
-        service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-        auth_header = self.headers.get("Authorization", "")
-        token = auth_header.removeprefix("Bearer ").strip()
-        if not supabase_url or not service_key or not token:
-            self.send_json(503, {"error": "Account deletion is not configured."})
-            return
-        try:
-            user_request = urllib.request.Request(
-                f"{supabase_url}/auth/v1/user",
-                headers={"apikey": service_key, "Authorization": f"Bearer {token}"},
-            )
-            with urllib.request.urlopen(user_request, timeout=15) as response:
-                user = json.load(response)
-            user_id = user.get("id")
-            if not user_id:
-                raise RuntimeError("Invalid authenticated user")
-            delete_request = urllib.request.Request(
-                f"{supabase_url}/auth/v1/admin/users/{urllib.parse.quote(user_id)}",
-                method="DELETE",
-                headers={"apikey": service_key, "Authorization": f"Bearer {service_key}"},
-            )
-            with urllib.request.urlopen(delete_request, timeout=15):
-                pass
-            self.send_json(200, {"deleted": True})
-        except urllib.error.HTTPError as error:
-            self.send_json(error.code, {"error": "The account could not be deleted."})
-        except (urllib.error.URLError, TimeoutError, RuntimeError):
-            self.send_json(502, {"error": "The account deletion service is temporarily unavailable."})
+        status, payload = handle_api(self, "POST", "/api/v1/account/delete")
+        self.send_json(status, payload)
         return
 
     def do_GET(self):

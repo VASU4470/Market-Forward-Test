@@ -109,7 +109,12 @@ function renderForwardTest(){
     const count = forwardTestSessions(test);
     const done = count >= test.targetSessions;
     const scheduled = test.startDate > dateKey;
-    if (done && test.status !== 'completed') { test.status = 'completed'; test.completedAt = new Date().toISOString(); }
+    if (done && test.status !== 'completed') {
+      test.status = 'completed'; test.completedAt = new Date().toISOString();
+      if (test.cloudId && window.PiZeroServices?.testPeriods) {
+        window.PiZeroServices.testPeriods.update(test.cloudId, {status:'completed', end_date:dateKey, completed_at:test.completedAt}).catch(() => {});
+      }
+    }
     panel.innerHTML = `<div class="forward-test-head"><div><span class="section-kicker">YOUR FORWARD TEST</span><h2 id="forwardTestTitle">${done ? 'Test complete' : scheduled ? 'Test scheduled' : 'Test in progress'}</h2><p>${test.targetSessions} market sessions · starts ${displayDateKey(test.startDate)}</p></div><span class="panel-note">${done ? 'COMPLETE' : scheduled ? 'SCHEDULED' : 'ACTIVE'}</span></div>
       <div class="forward-test-status"><strong>${count} / ${test.targetSessions}</strong><div class="forward-test-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${test.targetSessions}" aria-valuenow="${Math.min(count,test.targetSessions)}"><span style="width:${Math.min(100,Math.round(count/test.targetSessions*100))}%"></span></div><span class="forward-test-copy">${done ? 'Recorded sessions reached your goal.' : scheduled ? `Begins ${displayDateKey(test.startDate)}.` : 'Unique market dates with a prediction.'}</span></div>
       <div class="forward-test-actions"><button id="newForwardTest" class="secondary-btn" type="button">${done ? 'Start another test' : 'Set up another test'}</button><span class="forward-test-copy">Your earlier test record and predictions stay in history.</span></div>`;
@@ -123,7 +128,7 @@ function renderForwardTest(){
   }
 }
 
-document.addEventListener('submit', event => {
+document.addEventListener('submit', async event => {
   if (event.target.id !== 'forwardTestForm') return;
   event.preventDefault();
   const startDate = $('forwardTestStart').value;
@@ -134,8 +139,20 @@ document.addEventListener('submit', event => {
   const tests = activeState().forwardTests;
   if (activeForwardTest() && !confirm('Start a new test? The current test will be marked stopped, and its record will be kept.')) return;
   const previous = activeForwardTest();
-  if (previous) { previous.status = 'stopped'; previous.stoppedAt = new Date().toISOString(); }
-  tests.push({id:`test-${Date.now()}`, startDate, targetSessions, startedAt:new Date().toISOString(), status:'active'});
+  if (previous) {
+    previous.status = 'stopped'; previous.stoppedAt = new Date().toISOString();
+    if (previous.cloudId && window.PiZeroServices?.testPeriods) {
+      window.PiZeroServices.testPeriods.update(previous.cloudId, {status:'stopped', end_date:dateKey}).catch(() => {});
+    }
+  }
+  const test = {id:`test-${Date.now()}`, startDate, targetSessions, startedAt:new Date().toISOString(), status:'active'};
+  tests.push(test);
+  if (window.__MFT_SUPABASE_CLIENT && window.PiZeroServices?.testPeriods) {
+    try {
+      const cloud = await window.PiZeroServices.testPeriods.create({start_date:startDate, duration_sessions:targetSessions});
+      test.cloudId = cloud?.id || null;
+    } catch (_) { test.cloudSync = 'pending'; }
+  }
   saveRoot(); renderAll();
 });
 
@@ -143,7 +160,12 @@ document.addEventListener('click', event => {
   if (!event.target.closest('#newForwardTest')) return;
   const test = activeForwardTest();
   if (test && !confirm('Set up another test? The current test will be marked stopped, and its record will be kept.')) return;
-  if (test) { test.status = 'stopped'; test.stoppedAt = new Date().toISOString(); }
+  if (test) {
+    test.status = 'stopped'; test.stoppedAt = new Date().toISOString();
+    if (test.cloudId && window.PiZeroServices?.testPeriods) {
+      window.PiZeroServices.testPeriods.update(test.cloudId, {status:'stopped', end_date:dateKey}).catch(() => {});
+    }
+  }
   saveRoot(); renderAll();
 });
 
@@ -322,7 +344,7 @@ $('confirmLock').onclick = async () => {
   state.predictions.push(prediction);
   try {
     if (window.PiZeroServices?.predictions && window.__MFT_SUPABASE_CLIENT) {
-      await window.PiZeroServices.predictions.createPrediction({
+      const cloudPrediction = await window.PiZeroServices.predictions.createPrediction({
         index_id: selectedIndexId,
         trading_date: prediction.date,
         bias: prediction.bias,
@@ -331,6 +353,7 @@ $('confirmLock').onclick = async () => {
         support: Number(prediction.support),
         resistance: Number(prediction.resistance)
       });
+      prediction.cloudId = cloudPrediction?.id || null;
       prediction.cloudSync = 'synced';
     }
   } catch (_) {
@@ -339,7 +362,7 @@ $('confirmLock').onclick = async () => {
   saveRoot(); $('lockDialog').close(); pendingPrediction=null; renderAll();
 };
 
-$('actualForm').addEventListener('submit', e => {
+$('actualForm').addEventListener('submit', async e => {
   e.preventDefault();
   const p = current();
   if (!p) { alert('Lock today\'s prediction first.'); return; }
@@ -354,7 +377,24 @@ $('actualForm').addEventListener('submit', e => {
     alert('Enter a valid actual low and high.'); return;
   }
   p.actual = actual;
-  p.score = calculateScore(p, actual);
+  if (p.cloudId && window.PiZeroServices?.predictions?.scorePrediction) {
+    try {
+      const scored = await window.PiZeroServices.predictions.scorePrediction(p.cloudId);
+      if (scored?.scoring_status === 'scored') {
+        const detail = scored.score_details || {};
+        p.score = { total:Number(scored.score), detail:{ bias:detail.bias || 0, opening:detail.opening || 0, dayType:detail.day_type ?? detail.dayType ?? 0, support:detail.support || 0, resistance:detail.resistance || 0 }, rule_version:scored.scoring_rule_version };
+      } else {
+        p.score = null;
+        alert('The server is waiting for the persisted market session before scoring this prediction.');
+      }
+    } catch (error) {
+      alert(error.message || 'The server could not score this prediction yet.');
+      return;
+    }
+  } else {
+    // Keep local scoring only for the temporary pre-cloud migration fallback.
+    p.score = calculateScore(p, actual);
+  }
   saveRoot(); renderAll();
 });
 

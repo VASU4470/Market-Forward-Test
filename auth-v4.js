@@ -169,7 +169,12 @@
   function setBusy(next) { busy = next; card.classList.toggle('auth-busy', next); }
   function hideWorkspace() { authScreen.classList.remove('hidden'); appShell.classList.add('hidden'); }
   function clearAppProfile() {
-    try { const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{}'); store.activeProfile = null; localStorage.setItem('marketForwardTestV2', JSON.stringify(store)); } catch (_) {}
+    try {
+      const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{}');
+      if (store.profiles && store.activeProfile) delete store.profiles[store.activeProfile];
+      store.activeProfile = null;
+      localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
+    } catch (_) {}
   }
   function mirrorUser(user) {
     const key = user.email.toLowerCase();
@@ -242,9 +247,9 @@
         const {error} = await client.auth.signOut({scope:'others'});
         alert(error ? error.message : 'Other sessions have been signed out.');
       } else if (action === 'delete') {
-        if (prompt('Type DELETE to permanently remove your account:') !== 'DELETE') return;
+        if (prompt('Type DELETE MY ACCOUNT to permanently remove your account:') !== 'DELETE MY ACCOUNT') return;
         const {data:{session}} = await client.auth.getSession();
-        const response = await fetch('/api/account/delete', {method:'POST',headers:{Authorization:`Bearer ${session?.access_token || ''}`}});
+        const response = await fetch('/api/account/delete', {method:'POST',headers:{Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'},body:JSON.stringify({confirmation:'DELETE MY ACCOUNT'})});
         const result = await response.json().catch(() => ({}));
         if (!response.ok) return alert(result.error || 'Account deletion is not configured yet.');
         await client.auth.signOut(); clearAppProfile(); flow='signin'; hideWorkspace(); showEntry('Your account was permanently deleted.','success');
@@ -374,6 +379,40 @@
         const remoteIndices = await window.PiZeroServices?.indices?.getIndices();
         const defaultIndex = remoteIndices?.[0]?.id;
         await window.PiZeroServices?.predictions?.migrateLocalPredictions(user.id, defaultIndex);
+        const remotePredictions = await window.PiZeroServices?.predictions?.getMyPredictions();
+        const remoteTestPeriods = await window.PiZeroServices?.testPeriods?.list();
+        const localStore = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{}');
+        const localProfile = localStore.profiles?.[user.email.toLowerCase()];
+        if (localProfile && Array.isArray(remotePredictions)) {
+          localProfile.state = localProfile.state || {predictions: []};
+          localProfile.state.predictions = remotePredictions.map(row => ({
+            cloudId: row.id,
+            cloudSync: 'synced',
+            date: row.trading_date,
+            indexId: row.index_id,
+            bias: row.bias,
+            opening: row.opening_view,
+            dayType: row.day_type,
+            support: row.support,
+            resistance: row.resistance,
+            lockedAt: row.locked_at,
+            actual: null,
+            score: row.scoring_status === 'scored' ? { total:Number(row.score), detail:{...(row.score_details || {}), dayType:row.score_details?.day_type ?? row.score_details?.dayType ?? 0}, rule_version:row.scoring_rule_version } : null
+          }));
+          localProfile.state.forwardTests = (remoteTestPeriods || []).map(row => ({
+            cloudId: row.id,
+            id: row.id,
+            startDate: row.start_date,
+            targetSessions: row.duration_sessions,
+            startedAt: row.created_at,
+            completedAt: row.completed_at,
+            status: row.status,
+            stoppedAt: row.status === 'stopped' ? row.end_date : null
+          }));
+          localStore.profiles[user.email.toLowerCase()] = localProfile;
+          localStore.activeProfile = user.email.toLowerCase();
+          localStorage.setItem('marketForwardTestV2', JSON.stringify(localStore));
+        }
       } catch (_) {
         // Keep the local cache available if the Phase 1 schema/API is not deployed yet.
       }
