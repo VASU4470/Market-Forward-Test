@@ -1,4 +1,4 @@
-const CACHE = 'market-forward-test-v2-14';
+const CACHE = 'market-forward-test-v3-1';
 const ASSETS = [
   './',
   './index.html',
@@ -20,7 +20,7 @@ const ASSETS = [
   './services/ranking-service.js?v=1',
   './services/test-period-service.js?v=1',
   './auto-score.css?v=2.9',
-  './auto-score.js?v=4',
+  './auto-score.js?v=5',
   './manifest.webmanifest?v=2.8',
   './icon.svg?v=2.8'
 ];
@@ -39,6 +39,9 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || event.request.headers.has('Authorization') ||
+      url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)

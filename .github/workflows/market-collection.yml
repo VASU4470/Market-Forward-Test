@@ -1,0 +1,41 @@
+name: Collect completed market sessions
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: market-collection
+  cancel-in-progress: false
+jobs:
+  collect:
+    if: vars.MARKET_COLLECTION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Trigger the Render collector
+        env:
+          COLLECTOR_URL: ${{ vars.MARKET_COLLECTOR_URL }}
+          COLLECTOR_TOKEN: ${{ secrets.MARKET_COLLECTOR_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, urllib.request, urllib.error
+          url = os.environ['COLLECTOR_URL']
+          token = os.environ['COLLECTOR_TOKEN']
+          if not url.startswith('https://') or len(token) < 32:
+              sys.exit('Collector configuration is incomplete')
+          retry = False
+          for _ in range(10):
+              request = urllib.request.Request(url, data=b'{}', method='POST',
+                  headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+              try:
+                  with urllib.request.urlopen(request, timeout=180) as response:
+                      results = json.load(response)['results']
+              except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
+                  sys.exit('Collector request failed; check Render logs and administrator job status')
+              print(json.dumps(results))
+              if not results:
+                  break
+              retry = retry or any(r['status'] == 'retry' for r in results)
+          sys.exit(1 if retry else 0)
+          PY

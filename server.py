@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import logging
 import mimetypes
 import os
 import posixpath
@@ -11,6 +12,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from backend.routes.api import handle as handle_api
+from backend.market_data.api import enabled as collection_enabled
 
 ROOT = Path(__file__).resolve().parent
 INDIA_TZ = ZoneInfo("Asia/Kolkata")
@@ -45,92 +47,9 @@ def candle_date(candle):
     return str(candle[0])[:10]
 
 
-def sorted_candles(candles):
-    return sorted(candles, key=lambda c: str(c[0]))
-
-
-def classify_open(open_price, prev_close):
-    gap = (open_price - prev_close) / prev_close
-    if gap >= GAP_THRESHOLD:
-        return "Gap Up", gap
-    if gap <= -GAP_THRESHOLD:
-        return "Gap Down", gap
-    return "Flat", gap
-
-
-def classify_bias(close_price, prev_close):
-    change = (close_price - prev_close) / prev_close
-    if change >= BIAS_THRESHOLD:
-        return "Bullish", change
-    if change <= -BIAS_THRESHOLD:
-        return "Bearish", change
-    return "Sideways", change
-
-
-def classify_day_type(open_price, high_price, low_price, close_price, intraday):
-    session_range = max(high_price - low_price, 1e-9)
-    body_ratio = abs(close_price - open_price) / session_range
-    close_pos = (close_price - low_price) / session_range
-    final_move = (close_price - open_price) / open_price
-
-    if intraday:
-        candles = sorted_candles(intraday)
-        highs = [float(c[2]) for c in candles]
-        lows = [float(c[3]) for c in candles]
-        closes = [float(c[4]) for c in candles]
-        high_idx = highs.index(max(highs))
-        low_idx = lows.index(min(lows))
-        max_up = (max(highs) - open_price) / open_price
-        max_down = (min(lows) - open_price) / open_price
-
-        early_close = closes[min(3, len(closes) - 1)]
-        early_move = (early_close - open_price) / open_price
-
-        prev = open_price
-        path = 0.0
-        for value in closes:
-            path += abs(value - prev)
-            prev = value
-        efficiency = abs(close_price - open_price) / max(path, 1e-9)
-
-        bullish_reversal = (
-            low_idx < high_idx
-            and max_down <= -REVERSAL_EXCURSION
-            and final_move >= 0.001
-        )
-        bearish_reversal = (
-            high_idx < low_idx
-            and max_up >= REVERSAL_EXCURSION
-            and final_move <= -0.001
-        )
-        early_flip = abs(early_move) >= 0.0025 and early_move * final_move < 0
-
-        if bullish_reversal or bearish_reversal or early_flip:
-            return "Reversal", {
-                "bodyRatio": body_ratio,
-                "closePosition": close_pos,
-                "efficiency": efficiency,
-                "earlyMovePct": early_move * 100,
-            }
-
-        if body_ratio >= 0.45 and efficiency >= 0.35 and (close_pos >= 0.72 or close_pos <= 0.28):
-            return "Trend", {
-                "bodyRatio": body_ratio,
-                "closePosition": close_pos,
-                "efficiency": efficiency,
-                "earlyMovePct": early_move * 100,
-            }
-
-        return "Range", {
-            "bodyRatio": body_ratio,
-            "closePosition": close_pos,
-            "efficiency": efficiency,
-            "earlyMovePct": early_move * 100,
-        }
-
-    if body_ratio >= 0.55 and (close_pos >= 0.78 or close_pos <= 0.22):
-        return "Trend", {"bodyRatio": body_ratio, "closePosition": close_pos, "efficiency": None}
-    return "Range", {"bodyRatio": body_ratio, "closePosition": close_pos, "efficiency": None}
+from backend.market_data.classification import (
+    sorted_candles, classify_open, classify_bias, classify_day_type,
+)
 
 
 def market_result(target_date):
@@ -158,7 +77,7 @@ def market_result(target_date):
             }
         raise
     except Exception as exc:
-        return 502, {"error": "DATA_PROVIDER_ERROR", "message": f"Could not reach market-data provider: {exc}"}
+        return 502, {"error": "DATA_PROVIDER_ERROR", "message": "Could not reach the market-data provider."}
 
     daily = sorted_candles(daily_json.get("data", {}).get("candles", []))
     current_index = next((i for i, c in enumerate(daily) if candle_date(c) == target.isoformat()), None)
@@ -223,7 +142,12 @@ class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         parsed = urllib.parse.urlparse(path)
         clean = posixpath.normpath(urllib.parse.unquote(parsed.path)).lstrip("/")
-        return str((ROOT / clean).resolve())
+        candidate = (ROOT / clean).resolve()
+        if (not candidate.is_relative_to(ROOT) or any(part.startswith('.') for part in Path(clean).parts)
+            or candidate.suffix not in {'.html', '.js', '.css', '.png', '.svg', '.ico', '.webmanifest'}
+            or (len(Path(clean).parts) > 1 and Path(clean).parts[0] != 'services')):
+            return str(ROOT / '__not_found__')
+        return str(candidate)
 
     def send_json(self, status, payload):
         body = json_bytes(payload)
@@ -260,7 +184,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json(status, payload)
             return
         if parsed.path == "/api/market-result":
+            if collection_enabled():
+                status, payload = handle_api(self, "GET", "/api/v1/market-result")
+                self.send_json(status, payload)
+                return
             query = urllib.parse.parse_qs(parsed.query)
+            if (query.get("index") or ["NIFTY50"])[0] != "NIFTY50":
+                self.send_json(425, {"error": "RESULT_PENDING", "message": "Automatic collection is awaiting activation."})
+                return
             date = (query.get("date") or [""])[0]
             status, payload = market_result(date)
             self.send_json(status, payload)
@@ -284,7 +215,7 @@ class Handler(SimpleHTTPRequestHandler):
             html = html.replace(
                 "</body>",
                 '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>'
-                '<script src="auto-score.js?v=4"></script>'
+                '<script src="auto-score.js?v=5"></script>'
                 '<script src="result-fix.js?v=1"></script>'
                 '<script src="auth-v3.js?v=2"></script></body>',
             )
@@ -313,6 +244,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     port = int(os.getenv("PORT", "8080"))
     token_state = "configured" if (os.getenv("UPSTOX_ANALYTICS_TOKEN") or os.getenv("UPSTOX_ACCESS_TOKEN")) else "NOT configured"
     auth_state = "configured" if (os.getenv("SUPABASE_URL") and (os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("SUPABASE_ANON_KEY"))) else "NOT configured"

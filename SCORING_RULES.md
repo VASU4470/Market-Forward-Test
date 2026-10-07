@@ -3,7 +3,7 @@
 These rules are intentionally deterministic. The app should produce the same result from the same market data every time. AI is not used to decide whether a user's forecast was correct.
 
 ## 1. Expected opening
-Compare the Nifty session open with the previous trading session close.
+Compare the selected index session open with the previous trading session close.
 
 - **Gap Up**: open is at least `+0.15%` above previous close
 - **Gap Down**: open is at least `-0.15%` below previous close
@@ -12,7 +12,7 @@ Compare the Nifty session open with the previous trading session close.
 The threshold is a product parameter and can be revised after forward testing.
 
 ## 2. Actual market bias
-Compare the Nifty session close with the previous trading session close.
+Compare the selected index session close with the previous trading session close.
 
 - **Bullish**: close is at least `+0.20%` above previous close
 - **Bearish**: close is at least `-0.20%` below previous close
@@ -43,8 +43,10 @@ If a reversal is not detected, a session is classified as **Trend** when:
 ### Range
 All other sessions are classified as **Range**.
 
-### Fallback
-If intraday candles are temporarily unavailable, the system uses daily OHLC only:
+### Local/pilot fallback only
+Priority 3 authoritative collection requires complete 15-minute candles. Missing data stays pending and is retried; it never uses the fallback below.
+
+In the legacy pilot, if intraday candles are temporarily unavailable, the system uses daily OHLC only:
 
 - Trend if body >= 55% of range and the close is near an extreme,
 - otherwise Range.

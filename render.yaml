@@ -15,4 +15,13 @@ services:
         sync: false
       - key: UPSTOX_ANALYTICS_TOKEN
         sync: false
+      # Activate after the Phase 3 SQL migration and scheduler configuration.
+      - key: MARKET_COLLECTION_ENABLED
+        sync: false
+      - key: MARKET_DATA_PROVIDER
+        value: upstox
+      - key: MARKET_COLLECTOR_TOKEN
+        sync: false
+      - key: MARKET_ADMIN_USER_IDS
+        sync: false
 

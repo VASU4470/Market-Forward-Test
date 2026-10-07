@@ -107,11 +107,11 @@ class Priority2Tests(unittest.TestCase):
         ):
             self.assertIn(fragment, sql)
 
-    def test_service_role_reference_is_limited_to_account_deletion(self):
+    def test_service_role_reference_is_limited_to_explicit_admin_operations(self):
         backend_root = Path(__file__).parents[1].joinpath("backend")
         for path in backend_root.rglob("*.py"):
             text = path.read_text()
-            if path.name == "account.py":
+            if path == backend_root / "services" / "account.py" or path == backend_root / "market_data" / "repository.py":
                 continue
             self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", text, str(path))
 

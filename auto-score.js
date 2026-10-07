@@ -310,7 +310,7 @@
   }
 
   function isAutomaticMarketSupported() {
-    return selectedMarket()?.code === 'NIFTY50';
+    return ['NIFTY50', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BANKEX'].includes(selectedMarket()?.code);
   }
 
   function showSelectedResultState() {
@@ -372,7 +372,9 @@
     fetchBtn.disabled = true;
 
     try {
-      const response = await fetch(`/api/market-result?date=${encodeURIComponent(p.date)}`, { cache: 'no-store' });
+      const token = await window.PiZeroServices?.api?.accessToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(`/api/market-result?date=${encodeURIComponent(p.date)}&index=${encodeURIComponent(market.code)}`, { cache: 'no-store', headers });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {

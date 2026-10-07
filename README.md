@@ -38,13 +38,19 @@ SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
 ```
 
-Use the publishable/anon key in the browser. The service-role key is server-only and is used only for permanent account deletion; never expose it in HTML or client JavaScript. Before deploying the profile flow, run `supabase_profile_schema.sql` once in the Supabase SQL Editor. It creates the unique username constraint, profile RLS policies, and the opt-in public-profile view. In Supabase Authentication, enable Email and set the Site URL and allowed Redirect URLs to the exact deployed origin (including `https://`). Confirm that the email template contains a working confirmation link and that password reset emails are enabled. A frontend push cannot set these dashboard values. Production fails closed with a configuration error when Supabase is absent; localhost retains the local prototype for development.
+Use the publishable/anon key in the browser. The service-role key is server-only and is used for permanent account deletion and protected Priority 3 collection RPCs; never expose it in HTML or client JavaScript. Before deploying the profile flow, run `supabase_profile_schema.sql` once in the Supabase SQL Editor. It creates the unique username constraint, profile RLS policies, and the opt-in public-profile view. In Supabase Authentication, enable Email and set the Site URL and allowed Redirect URLs to the exact deployed origin (including `https://`). Confirm that the email template contains a working confirmation link and that password reset emails are enabled. A frontend push cannot set these dashboard values. Production fails closed with a configuration error when Supabase is absent; localhost retains the local prototype for development.
 
 ## Local profile onboarding preview
 
 To repeatedly inspect the signup/profile screens without creating users or sending email, run `python3 server.py` and open `http://localhost:8080/?dev-test=1`. This local-only preview simulates a verified email, validates the personal details, shows the adaptive trading/investing questions, and lets you restart. It never calls Supabase and does not save a profile or password. The preview is disabled on the Render domain.
 
-## Automatic scoring pilot
+## Priority 3 automatic scoring
+
+The Upstox adapter, durable collection queue, protected administrator fallback and atomic session publication/scoring are implemented. See [PRIORITY3.md](PRIORITY3.md) for the migration, environment variables, scheduler setup, tests and rollout order. Collection defaults to disabled until configuration is complete.
+
+The following pilot remains available while Priority 3 is disabled.
+
+### Legacy automatic scoring pilot
 The automatic-scoring development server uses Upstox Historical Data V3 and keeps the market-data credential on the server side. The browser never receives the token.
 
 The pilot currently uses:
@@ -88,7 +94,7 @@ The browser calls `/api/v1/indices`, `/api/v1/profile`, and `/api/v1/predictions
 
 ## Phase 2 server-authoritative scoring
 
-Phase 2 adds `supabase_phase2_schema.sql`. Run it only after reviewing the existing Phase 1 tables. It adds user-owned `test_periods` (1–365 sessions), immutable prediction locking, score fields, an atomic `score_prediction` RPC, protected statistics APIs, and an opt-in-only ranking RPC. The service-role key is used only by the protected account-deletion operation; normal data access uses the authenticated user's token.
+Phase 2 adds `supabase_phase2_schema.sql`. Run it only after reviewing the existing Phase 1 tables. It adds user-owned `test_periods` (1–365 sessions), immutable prediction locking, score fields, an atomic `score_prediction` RPC, protected statistics APIs, and an opt-in-only ranking RPC. The service-role key is used by protected account deletion and Priority 3 collection; normal user data access uses the authenticated user's token.
 
 Final scores are produced only when a persisted `market_sessions` row exists for the prediction's index and trading date. The scoring rule is versioned as `p2-v1`; a score is counted as correct for statistics when its total is at least 60/100. Ranking requires explicit opt-in and at least five server-scored predictions, and returns only username and aggregate performance fields.
 
