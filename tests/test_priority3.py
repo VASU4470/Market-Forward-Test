@@ -1,5 +1,8 @@
 import copy
+import base64
+import hashlib
 import io
+import json
 import json
 import os
 import unittest
@@ -12,6 +15,7 @@ from backend.market_data.api import manual_result, require_admin, run_job
 from backend.market_data.calendar import IST, require_closed, session_window
 from backend.market_data.collector import collect
 from backend.market_data.normalize import normalize
+from backend.market_data.oidc import InvalidIdentity, verify_github_token
 from backend.market_data.provider import DataUnavailable, SessionWindow
 from backend.market_data.repository import rpc
 from backend.market_data.upstox import DEFAULT_INSTRUMENTS, Upstox, instrument_key
@@ -64,6 +68,26 @@ class FakeRepository:
 
 
 class Priority3Tests(unittest.TestCase):
+    # Disposable test key only; GitHub's live signing keys are fetched at runtime.
+    TEST_RSA_N = 'r4xPBocB81oSt4jIm92yrISgXc0rpLO18ZocuOfROYhudafIQ-tcfyS_VGVxesWwPIDyWiXrmYAqobOeqX9ve4caQjp0FyxIBlkC58jNxuZ51dWfcn9MWXUVdP9piIu_3z4uKcARUX0n2RHQ4MZjEs1EBvSFKbD9947o09znKxPg3E3yAKGxkgWsFOotqznUWJYL0-YVbhJTU8itUYfK3x7xtbeR2koZiVi9avQbwRk3_LbIl_Jc5kbFyOvc0jMXj8j5ZIrSzvB3hksZXGacka_hOduWPHjxj57UKhqCzxqV85PQ12SdIAp5v2dbPvz5anLdYLdfxxNVQCNTyMWG0Q'
+    TEST_RSA_D = 'Aix3GAoY7JX7cFlZvpBWs4sq3y54sV_mS1kQrPt13EQDtiI_ORQTf6GJWvasmowTHBSuq44Xpj1vibQLLWceDsYD_bjykgzi0W1Nu2gBoEpfTNYJ1OWdoOfxvZKiEGZGmHGRKcQukrc9hJMTZo0eUe_HvVxOv87oviV_XYw5Mo_Vs1pe5uzS_GCiBd8bqcifTBubm5O1zXV6iPsKn6JvIaYeiZjWq3qgIt0aBh-UzCYmpTELB1qKp6HJtwrkAwl2lu1w_sYxyjAQWiLbUyT8DYG1AifUbHFw_-GGbbWC_Bbh5MWACWCSAG0Qvarc6F7s868dT8UDzSHQLmJrdDmnSQ'
+
+    @classmethod
+    def signed_oidc_token(cls, claims, corrupt=False):
+        def b64(data):
+            return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
+        header = b64(json.dumps({'alg':'RS256','kid':'test-key','typ':'JWT'},separators=(',',':')).encode())
+        payload = b64(json.dumps(claims,separators=(',',':')).encode())
+        message = (header+'.'+payload).encode()
+        digest_info = bytes.fromhex('3031300d060960864801650304020105000420') + hashlib.sha256(message).digest()
+        n = int.from_bytes(base64.urlsafe_b64decode(cls.TEST_RSA_N+'='*(-len(cls.TEST_RSA_N)%4)),'big')
+        d = int.from_bytes(base64.urlsafe_b64decode(cls.TEST_RSA_D+'='*(-len(cls.TEST_RSA_D)%4)),'big')
+        encoded = b'\x00\x01' + b'\xff'*(256-len(digest_info)-3) + b'\x00' + digest_info
+        signature = b64(pow(int.from_bytes(encoded,'big'),d,n).to_bytes(256,'big'))
+        if corrupt:
+            signature = b64(bytes([0])*256)
+        return header+'.'+payload+'.'+signature
+
     def normalize(self, raw=None):
         return normalize(JOB, 'upstox', DEFAULT_INSTRUMENTS['NIFTY50'], DAY, WINDOW, raw or fixture(), NOW)
 
@@ -165,13 +189,34 @@ class Priority3Tests(unittest.TestCase):
             self.assertEqual(caught.exception.code, code)
             self.assertNotIn('secret', str(caught.exception))
 
-    @patch.dict(os.environ, {'MARKET_COLLECTION_ENABLED':'true','MARKET_COLLECTOR_TOKEN':'x'*40})
+    @patch.dict(os.environ, {'MARKET_COLLECTION_ENABLED':'true'})
     def test_job_endpoint_rejects_missing_and_wrong_secrets(self):
         for headers in ({}, {'Authorization':'Bearer wrong'}):
             with self.assertRaises(ApiError): run_job(headers)
-        with patch('backend.market_data.api.collect', return_value=[]) as run:
+        with patch('backend.market_data.api.verify_github_token') as verify, patch('backend.market_data.api.collect', return_value=[]) as run:
             self.assertEqual(run_job({'Authorization':'Bearer '+'x'*40}), {'results':[]})
         run.assert_called_once()
+        verify.assert_called_once()
+
+    def test_collector_rejects_unverified_oidc_identities(self):
+        for token in ('', 'header.payload.signature', 'eyJhbGciOiJub25lIn0.e30.'):
+            with self.subTest(token=token), self.assertRaises(InvalidIdentity):
+                verify_github_token(token, now=1_800_000_000)
+
+    def test_github_oidc_signature_and_repository_scope(self):
+        now = 1_800_000_000
+        claims = {'iss':'https://token.actions.githubusercontent.com','aud':'market-forward-test-collector',
+            'repository':'VASU4470/Market-Forward-Test','repository_owner':'VASU4470',
+            'workflow_ref':'VASU4470/Market-Forward-Test/.github/workflows/market-collection.yml@refs/heads/main',
+            'ref':'refs/heads/main','event_name':'schedule','iat':now-10,'nbf':now-5,'exp':now+60}
+        jwks = {'keys':[{'kid':'test-key','kty':'RSA','alg':'RS256','n':self.TEST_RSA_N,'e':'AQAB'}]}
+        with patch('backend.market_data.oidc._keys',return_value=jwks):
+            self.assertTrue(verify_github_token(self.signed_oidc_token(claims),now))
+            for changes, corrupt in (({'repository':'attacker/other'},False),
+                ({'aud':'wrong-audience'},False),({'event_name':'pull_request'},False),
+                ({'exp':now-1},False),({},True)):
+                with self.subTest(changes=changes,corrupt=corrupt), self.assertRaises(InvalidIdentity):
+                    verify_github_token(self.signed_oidc_token({**claims,**changes},corrupt),now)
 
     @patch.dict(os.environ, {'MARKET_ADMIN_USER_IDS':'admin-id','MARKET_COLLECTION_ENABLED':'true'})
     def test_administrator_cannot_be_self_declared(self):

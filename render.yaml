@@ -20,8 +20,6 @@ services:
         sync: false
       - key: MARKET_DATA_PROVIDER
         value: upstox
-      - key: MARKET_COLLECTOR_TOKEN
-        sync: false
       - key: MARKET_ADMIN_USER_IDS
         sync: false
 

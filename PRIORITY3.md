@@ -9,15 +9,14 @@
    migrations afterward: they can restore superseded grants/functions.
 3. Deploy this revision to the existing Render Python service. No additional
    paid Render service or production package dependency is introduced.
-4. Configure the server variables below in Render → service → Environment.
+4. Set GitHub repository variable `MARKET_COLLECTOR_URL` to
+   `https://market-forward-test.onrender.com/api/v1/internal/market-collect`.
+   The workflow uses a short-lived GitHub OIDC token scoped to this repository,
+   main branch and workflow. There is no shared scheduler secret to create.
+5. Configure the server variables below in Render → service → Environment.
    Paste secrets only into secret-value fields, then save/redeploy. Never put
    credentials in client code, committed files, logs, screenshots or chat.
-5. Create GitHub repository secret `MARKET_COLLECTOR_TOKEN` with the SAME random
-   secret used on Render. Use a password manager to generate 48+ characters.
-   GitHub Actions does not need the Upstox token or Supabase service key.
-6. Set GitHub repository variable `MARKET_COLLECTOR_URL` to
-   `https://market-forward-test.onrender.com/api/v1/internal/market-collect`.
-7. After the migration and provider permission for this hosted use are confirmed,
+6. After the migration and provider permission for this hosted use are confirmed,
    set Render `MARKET_COLLECTION_ENABLED=true` and GitHub repository variable
    `MARKET_COLLECTION_ENABLED=true`. Enable Actions and manually run
    **Collect completed market sessions**. Scheduled workflows use the default branch.
@@ -35,7 +34,6 @@
 | `UPSTOX_ANALYTICS_TOKEN` | Server-only read-only token; renew before its one-year expiry |
 | `MARKET_COLLECTION_ENABLED` | Defaults to `false`; `true` activates collection and persisted-result reads |
 | `MARKET_DATA_PROVIDER` | Defaults to `upstox` |
-| `MARKET_COLLECTOR_TOKEN` | Random secret, at least 32 characters; authorizes only collection |
 | `MARKET_ADMIN_USER_IDS` | Comma-separated Supabase Auth UUIDs; empty disables administrator fallback |
 | `UPSTOX_INSTRUMENT_NIFTY50` | Optional instrument override |
 | `UPSTOX_INSTRUMENT_BANKNIFTY` | Optional instrument override |

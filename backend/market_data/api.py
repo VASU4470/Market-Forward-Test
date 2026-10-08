@@ -1,4 +1,3 @@
-import hmac
 import math
 import os
 import uuid
@@ -9,6 +8,7 @@ from ..errors import ApiError
 from .calendar import IST, require_closed
 from .collector import collect
 from .normalize import normalize
+from .oidc import InvalidIdentity, verify_github_token
 from .provider import DataUnavailable, SessionWindow
 from .repository import Repository, rpc
 
@@ -33,9 +33,12 @@ def require_admin(user):
 
 def run_job(headers):
     require_enabled()
-    secret = os.getenv('MARKET_COLLECTOR_TOKEN', '')
     supplied = headers.get('Authorization', '')
-    if len(secret) < 32 or not hmac.compare_digest(supplied.encode(), ('Bearer ' + secret).encode()):
+    if not supplied.startswith('Bearer ') or len(supplied) < 32:
+        raise ApiError(403, 'JOB_FORBIDDEN', 'Collector authorization required.')
+    try:
+        verify_github_token(supplied[7:])
+    except InvalidIdentity:
         raise ApiError(403, 'JOB_FORBIDDEN', 'Collector authorization required.')
     return {'results': collect()}
 

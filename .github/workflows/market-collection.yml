@@ -3,7 +3,8 @@ on:
   schedule:
     - cron: '17,47 * * * *'
   workflow_dispatch:
-permissions: {}
+permissions:
+  id-token: write
 concurrency:
   group: market-collection
   cancel-in-progress: false
@@ -16,14 +17,20 @@ jobs:
       - name: Trigger the Render collector
         env:
           COLLECTOR_URL: ${{ vars.MARKET_COLLECTOR_URL }}
-          COLLECTOR_TOKEN: ${{ secrets.MARKET_COLLECTOR_TOKEN }}
         run: |
           python3 - <<'PY'
           import json, os, sys, urllib.request, urllib.error
           url = os.environ['COLLECTOR_URL']
-          token = os.environ['COLLECTOR_TOKEN']
-          if not url.startswith('https://') or len(token) < 32:
+          if not url.startswith('https://'):
               sys.exit('Collector configuration is incomplete')
+          oidc_url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=market-forward-test-collector'
+          oidc_request = urllib.request.Request(oidc_url, headers={
+              'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          try:
+              with urllib.request.urlopen(oidc_request, timeout=30) as response:
+                  token = json.load(response)['value']
+          except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
+              sys.exit('Could not obtain the short-lived workflow identity')
           retry = False
           for _ in range(10):
               request = urllib.request.Request(url, data=b'{}', method='POST',
