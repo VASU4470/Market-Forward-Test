@@ -21,6 +21,7 @@ def collect(source=None, repository=None, now=None):
     outcomes = []
     for job in jobs:
         status, code, delay = 'success', None, 3600
+        raw = None
         try:
             # A previous worker may have committed the result but lost its response.
             if job.get('existing_session'):
@@ -47,12 +48,16 @@ def collect(source=None, repository=None, now=None):
                 repository.publish(result)
         except DataUnavailable as error:
             code = error.code
-            status = 'closed' if code == 'NON_TRADING_DAY' else 'retry'
+            status = ('quarantined' if code.startswith('INCONSISTENT_') else
+                      'closed' if code == 'NON_TRADING_DAY' else 'retry')
             delay = max(error.retry_after, min(86400, 300 * 2 ** min(job.get('attempts', 1), 8)))
         except Exception:
             # Exception strings may contain provider request details; log only safe codes.
             status, code = 'retry', 'COLLECTOR_INTERNAL_ERROR'
-        repository.finish(job, status, code, delay)
+        if status == 'quarantined':
+            repository.quarantine(job, code, {'raw_market_data':raw,'policy':'ohlc-10ppm-0.05-v1'})
+        else:
+            repository.finish(job, status, code, delay)
         outcome = {'index': job['code'], 'date': job['trading_date'], 'status': status, 'error': code}
         log.info(json.dumps(outcome))
         outcomes.append(outcome)

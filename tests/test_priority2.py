@@ -32,7 +32,7 @@ class Priority2Tests(unittest.TestCase):
             "support": 100,
             "resistance": 200,
         }
-        with patch("backend.services.predictions.insert", return_value=[{"id": "p1", "user_id": "user-a"}]) as insert:
+        with patch("backend.services.predictions.ensure_forecast_calendar"), patch("backend.services.predictions.insert", return_value=[{"id": "p1", "user_id": "user-a"}]) as insert:
             create_prediction(user, payload)
         sent = insert.call_args.args[2]
         self.assertEqual(sent["user_id"], "user-a")

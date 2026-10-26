@@ -48,7 +48,7 @@ class HTTPTests(unittest.TestCase):
         self.assertIn('public-key', html)
         for secret in ('private-provider', 'private-service', 'private-job'):
             self.assertNotIn(secret, html)
-        self.assertIn('auto-score.js?v=5', html)
+        self.assertIn('auto-score.js?v=6', html)
         for path in ('/auto-score.js', '/services/api-client.js', '/pizero-logo.png'):
             if path.endswith('.png'):
                 with urllib.request.urlopen(self.base + path) as response:

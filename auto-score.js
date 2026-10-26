@@ -18,22 +18,8 @@
   }
 
   function dedupeLocalPredictions() {
-    const state = activeState?.();
-    if (!state?.predictions?.length) return false;
-
-    const unique = new Map();
-    for (const prediction of state.predictions) {
-      const key = `${prediction.date || ''}::${predictionIndexId(prediction)}`;
-      const existing = unique.get(key);
-      if (!existing || predictionQuality(prediction) > predictionQuality(existing)) {
-        unique.set(key, prediction);
-      }
-    }
-
-    if (unique.size === state.predictions.length) return false;
-    state.predictions = [...unique.values()];
-    saveRoot();
-    return true;
+    // Never discard persisted variants merely to simplify rendering.
+    return false;
   }
 
   function indexForPrediction(prediction) {
@@ -102,10 +88,10 @@
     const market = indexForPrediction(prediction);
     const dateObj = new Date(`${prediction.date}T12:00:00+05:30`);
     const date = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: INDIA_TZ }).format(dateObj);
-    const actual = prediction.actual;
+    const actual = prediction.actual || {};
     const score = prediction.score;
     const detail = score?.detail || {};
-    const scoreLabel = score ? (score.source === 'server' || score.rule_version ? 'Server scored' : 'Scored') : 'Score pending';
+    const scoreLabel = score && prediction.verificationStatus !== 'verified' ? 'Historical / unverified' : score ? (score.source === 'server' || score.rule_version ? 'Server scored' : 'Scored') : 'Score pending';
     const canScoreNow = !score;
 
     historyDialog.innerHTML = `
@@ -331,7 +317,7 @@
     if (p.score) {
       const isServerScore = p.score.source === 'server' || p.score.rule_version;
       const mode = isServerScore ? 'Server' : (p.actualSource?.mode === 'automatic' ? 'Automatically' : 'Manually');
-      const note = isServerScore ? '' : ' · local fallback; not included in server statistics';
+      const note = p.verificationStatus === 'verified' ? '' : ' · historical/unverified; excluded from verified rankings';
       setState('success', `${mode} scored ${p.score.total}/100`, `${market.display_name} · ${p.bias} · ${p.opening} · ${p.dayType}${note}`);
       fetchBtn.textContent = isAutomaticMarketSupported() ? 'REFRESH MARKET RESULT' : 'AUTOMATIC RESULT UNAVAILABLE';
       actualForm.hidden = true;

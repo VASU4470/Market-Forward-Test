@@ -8,7 +8,13 @@ from ..config import supabase_url
 from .provider import DataUnavailable
 
 OPERATIONS = frozenset({'claim_market_jobs', 'finish_market_job', 'publish_market_session',
-                        'get_market_collection_status', 'retry_market_job'})
+                        'get_market_collection_status', 'retry_market_job', 'quarantine_market_job',
+                        'get_forecast_session', 'record_forecast_session'})
+
+
+def calendar_configured():
+    """Expose readiness only; service-role material stays in this isolated client."""
+    return bool(os.getenv('SUPABASE_SERVICE_ROLE_KEY') and os.getenv('UPSTOX_ANALYTICS_TOKEN'))
 
 
 def rpc(name, payload=None):
@@ -29,6 +35,10 @@ def rpc(name, payload=None):
 
 
 class Repository:
+    def quarantine(self, job, code, audit):
+        return rpc('quarantine_market_job', {'p_job_id':job['job_id'], 'p_lease':job['lease_token'],
+            'p_error':code, 'p_audit':audit})
+
     def claim(self, provider_name):
         return rpc('claim_market_jobs', {'p_provider': provider_name}) or []
 

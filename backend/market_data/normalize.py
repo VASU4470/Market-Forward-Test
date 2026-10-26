@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal
 from datetime import datetime, timedelta
 
 from .calendar import IST
@@ -8,6 +9,8 @@ from .provider import DataUnavailable
 
 def ohlc(row):
     try:
+        if not isinstance(row, (list, tuple)) or len(row) < 5 or any(isinstance(v,bool) for v in row[1:5]):
+            raise ValueError
         values = [float(v) for v in row[1:5]]
         if len(values) != 4 or any(not math.isfinite(v) or v <= 0 for v in values):
             raise ValueError
@@ -59,6 +62,14 @@ def normalize(index, provider_name, instrument, day, window, raw, now):
             raise DataUnavailable('INCONSISTENT_OHLC')
     if abs(float(bars[0][1][1]) - op) > tolerance:
         raise DataUnavailable('INCONSISTENT_OPEN')
+    reconciled = (('OPEN',op,float(bars[0][1][1])),
+                  ('HIGH',high,max(float(row[2]) for _,row in bars)),
+                  ('LOW',low,min(float(row[3]) for _,row in bars)),
+                  ('CLOSE',close,float(bars[-1][1][4])))
+    for field, daily_value, intraday_value in reconciled:
+        daily_decimal, intraday_decimal = Decimal(str(daily_value)), Decimal(str(intraday_value))
+        if abs(daily_decimal-intraday_decimal) > max(Decimal('.05'),abs(daily_decimal)*Decimal('.00001')):
+            raise DataUnavailable('INCONSISTENT_'+field)
     bias, _ = classify_bias(close, prev)
     opening, _ = classify_open(op, prev)
     day_type, metrics = classify_day_type(op, high, low, close, [r for _, r in bars])
@@ -74,5 +85,6 @@ def normalize(index, provider_name, instrument, day, window, raw, now):
         'methodology': {'version': 'p3-classification-v1', 'scoring_rule': 'p2-v1',
                         'metrics': metrics, 'intraday_count': len(bars),
                         'previous_trading_date': previous_day.isoformat(),
-                        'calendar': window.audit, 'daily_close': 'provider daily candle'},
+                        'calendar': window.audit, 'daily_close': 'provider daily candle',
+                        'reconciliation': {'policy':'ohlc-10ppm-0.05-v1','fields':['open','high','low','close']}},
     }

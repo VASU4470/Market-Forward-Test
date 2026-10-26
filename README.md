@@ -46,6 +46,8 @@ To repeatedly inspect the signup/profile screens without creating users or sendi
 
 ## Priority 3 automatic scoring
 
+Priority 3 remediation is prepared for review in [REMEDIATION_POLICY.md](REMEDIATION_POLICY.md), [the root-cause/test/rollback report](docs/REMEDIATION_REVIEW.md), and [the staging checklist](docs/STAGING_VALIDATION.md). The new additive `supabase_phase3_remediation.sql` follows Phase 3; it is not applied automatically. Historical grades remain readable, but only server-timely forecasts with trusted dated calendars enter verified aggregates. No production change or collector activation is part of the remediation task.
+
 The Upstox adapter, durable collection queue, protected administrator fallback and atomic session publication/scoring are implemented. See [PRIORITY3.md](PRIORITY3.md) for the migration, environment variables, scheduler setup, tests and rollout order. Collection defaults to disabled until configuration is complete.
 
 The following pilot remains available while Priority 3 is disabled.
