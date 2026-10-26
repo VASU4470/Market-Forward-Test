@@ -3,7 +3,7 @@ from ..data.supabase_rest import select
 
 def _user_predictions(user):
     return select("predictions", user["token"], {
-        "select": "id,scoring_status,score,scored_at,trading_date,test_period_id",
+        "select": "id,scoring_status,score,scored_at,trading_date,test_period_id,verification_status,submission_kind",
         "user_id": f"eq.{user['id']}",
         "order": "trading_date.desc",
     })
@@ -19,11 +19,13 @@ def _user_periods(user):
 
 def get_my_statistics(user):
     predictions = _user_predictions(user)
-    scored = [row for row in predictions if row.get("scoring_status") == "scored" and row.get("score") is not None]
+    verified = [row for row in predictions if row.get('verification_status') == 'verified']
+    scored = [row for row in verified if row.get("scoring_status") == "scored" and row.get("score") is not None]
     correct = [row for row in scored if float(row.get("score", 0)) >= 60]
     average = round(sum(float(row["score"]) for row in scored) / len(scored), 2) if scored else None
     return {
-        "total_predictions": len(predictions),
+        "total_predictions": len(verified),
+        "historical_predictions": len(predictions) - len(verified),
         "completed_predictions": len(scored),
         "correct_predictions": len(correct),
         "accuracy_percentage": round(len(correct) * 100 / len(scored), 2) if scored else None,

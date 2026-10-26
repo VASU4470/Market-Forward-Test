@@ -19,24 +19,36 @@ jobs:
           COLLECTOR_URL: ${{ vars.MARKET_COLLECTOR_URL }}
         run: |
           python3 - <<'PY'
-          import json, os, sys, urllib.request, urllib.error
+          import json, os, sys, urllib.request, urllib.error, urllib.parse
           url = os.environ['COLLECTOR_URL']
-          if not url.startswith('https://'):
-              sys.exit('Collector configuration is incomplete')
-          oidc_url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=market-forward-test-collector'
-          oidc_request = urllib.request.Request(oidc_url, headers={
-              'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
-          try:
-              with urllib.request.urlopen(oidc_request, timeout=30) as response:
-                  token = json.load(response)['value']
-          except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
-              sys.exit('Could not obtain the short-lived workflow identity')
+          parsed = urllib.parse.urlsplit(url)
+          if (parsed.scheme != 'https' or parsed.hostname != 'market-forward-test.onrender.com'
+              or parsed.port not in (None, 443) or parsed.username is not None or parsed.password is not None
+              or parsed.path != '/api/v1/internal/market-collect' or parsed.query or parsed.fragment):
+              sys.exit('Collector destination is not approved')
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  raise urllib.error.URLError('Redirects are not allowed')
+          opener = urllib.request.build_opener(NoRedirect())
+          def fresh_identity():
+              oidc_url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=market-forward-test-collector'
+              request = urllib.request.Request(oidc_url, headers={
+                  'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+              try:
+                  with opener.open(request, timeout=30) as response:
+                      token = json.load(response)['value']
+                  if not isinstance(token, str) or not token or len(token) > 16384:
+                      raise ValueError
+                  return token
+              except (urllib.error.URLError, TimeoutError, ValueError, KeyError, TypeError):
+                  sys.exit('Could not obtain the short-lived workflow identity')
           retry = False
           for _ in range(10):
+              token = fresh_identity()  # Never reuse a token across a 20-minute drain.
               request = urllib.request.Request(url, data=b'{}', method='POST',
                   headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
               try:
-                  with urllib.request.urlopen(request, timeout=180) as response:
+                  with opener.open(request, timeout=180) as response:
                       results = json.load(response)['results']
               except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
                   sys.exit('Collector request failed; check Render logs and administrator job status')

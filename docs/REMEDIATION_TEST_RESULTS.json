@@ -1,0 +1,84 @@
+{
+  "audited_commit": "d450e3fdf8485558906a42142882fc50f7f686af",
+  "branch": "remediation/priority3-integrity",
+  "suites": {
+    "python_security_http": {
+      "passed": 56,
+      "failed": 0
+    },
+    "postgresql_original": {
+      "passed": 12,
+      "failed": 0
+    },
+    "postgresql_remediation": {
+      "passed": 12,
+      "failed": 0
+    },
+    "javascript_sync": {
+      "passed": 14,
+      "failed": 0
+    },
+    "chromium_integration": {
+      "passed": 6,
+      "failed": 0
+    }
+  },
+  "checks": [
+    "Python compileall",
+    "All root/service JavaScript syntax",
+    "Git whitespace check"
+  ],
+  "staging_executed": false,
+  "deployment_performed": false,
+  "collector_activated": false,
+  "limitations": [
+    "PostgreSQL/WASM is not live Supabase/PostgREST or multi-connection stress coverage",
+    "Browser API/auth responses are local fixtures",
+    "Live GitHub OIDC/provider entitlements and operational staging checks remain pending"
+  ],
+  "changed_files": [
+    ".github/workflows/market-collection.yml",
+    "PRIORITY3.md",
+    "README.md",
+    "REMEDIATION_POLICY.md",
+    "app.js",
+    "auth-v3.js",
+    "auth-v4.js",
+    "auto-score.js",
+    "backend/market_data/collector.py",
+    "backend/market_data/normalize.py",
+    "backend/market_data/oidc.py",
+    "backend/market_data/repository.py",
+    "backend/services/forecast_calendar.py",
+    "backend/services/predictions.py",
+    "backend/services/statistics.py",
+    "backend/services/test_periods.py",
+    "docs/REMEDIATION_REVIEW.md",
+    "docs/REMEDIATION_TEST_RESULTS.json",
+    "docs/STAGING_VALIDATION.md",
+    "index.html",
+    "lock-fix.js",
+    "server.py",
+    "services/api-client.js",
+    "services/prediction-service.js",
+    "services/test-period-service.js",
+    "supabase_phase3_remediation.sql",
+    "sw.js",
+    "tests/browser_integration.py",
+    "tests/package.json",
+    "tests/remediation-database.mjs",
+    "tests/requirements-browser.txt",
+    "tests/sync.test.mjs",
+    "tests/test_priority2.py",
+    "tests/test_priority3.py",
+    "tests/test_priority3_http.py",
+    "tests/test_remediation.py"
+  ],
+  "live_market_or_database_accessed": false,
+  "production_settings_modified": false,
+  "tool_versions": {
+    "python": "Python 3.12.14",
+    "node": "v24.19.0",
+    "npm": "11.9.0"
+  }
+}

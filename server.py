@@ -215,9 +215,9 @@ class Handler(SimpleHTTPRequestHandler):
             html = html.replace(
                 "</body>",
                 '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>'
-                '<script src="auto-score.js?v=5"></script>'
+                '<script src="auto-score.js?v=6"></script>'
                 '<script src="result-fix.js?v=1"></script>'
-                '<script src="auth-v3.js?v=2"></script></body>',
+                '<script src="auth-v3.js?v=3"></script></body>',
             )
             body = html.encode("utf-8")
             self.send_response(200)

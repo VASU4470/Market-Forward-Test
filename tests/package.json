@@ -1,6 +1,11 @@
 {
   "private": true,
   "type": "module",
-  "scripts": { "test": "node database.mjs" },
-  "devDependencies": { "@electric-sql/pglite": "0.5.8" }
+  "scripts": {
+    "test": "node database.mjs && node remediation-database.mjs && node --test sync.test.mjs",
+    "test:browser": "cd .. && python3 -m unittest tests.browser_integration -v"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
 }

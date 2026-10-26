@@ -171,9 +171,10 @@
   function clearAppProfile() {
     try {
       const store = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{}');
-      if (store.profiles && store.activeProfile) delete store.profiles[store.activeProfile];
+      // Signing out must not delete unsynchronized records or local history.
       store.activeProfile = null;
       localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
+      window.dispatchEvent(new Event('mft:sync-updated'));
     } catch (_) {}
   }
   function mirrorUser(user) {
@@ -192,6 +193,7 @@
     store.profiles[key].state.language = language;
     store.activeProfile = key;
     localStorage.setItem('marketForwardTestV2', JSON.stringify(store));
+      window.dispatchEvent(new Event('mft:sync-updated'));
   }
   function renderAccountProfile(user) {
     const meta = user.user_metadata || {};
@@ -400,38 +402,8 @@
         await window.PiZeroServices?.predictions?.migrateLocalPredictions(user.id, defaultIndex);
         const remotePredictions = await window.PiZeroServices?.predictions?.getMyPredictions();
         const remoteTestPeriods = await window.PiZeroServices?.testPeriods?.list();
-        const localStore = JSON.parse(localStorage.getItem('marketForwardTestV2') || '{}');
-        const localProfile = localStore.profiles?.[user.email.toLowerCase()];
-        if (localProfile && Array.isArray(remotePredictions)) {
-          localProfile.state = localProfile.state || {predictions: []};
-          localProfile.state.predictions = remotePredictions.map(row => ({
-            cloudId: row.id,
-            cloudSync: 'synced',
-            date: row.trading_date,
-            indexId: row.index_id,
-            bias: row.bias,
-            opening: row.opening_view,
-            dayType: row.day_type,
-            support: row.support,
-            resistance: row.resistance,
-            lockedAt: row.locked_at,
-            actual: null,
-            score: row.scoring_status === 'scored' ? { total:Number(row.score), detail:{...(row.score_details || {}), dayType:row.score_details?.day_type ?? row.score_details?.dayType ?? 0}, rule_version:row.scoring_rule_version } : null
-          }));
-          localProfile.state.forwardTests = (remoteTestPeriods || []).map(row => ({
-            cloudId: row.id,
-            id: row.id,
-            startDate: row.start_date,
-            targetSessions: row.duration_sessions,
-            startedAt: row.created_at,
-            completedAt: row.completed_at,
-            status: row.status,
-            stoppedAt: row.status === 'stopped' ? row.end_date : null
-          }));
-          localStore.profiles[user.email.toLowerCase()] = localProfile;
-          localStore.activeProfile = user.email.toLowerCase();
-          localStorage.setItem('marketForwardTestV2', JSON.stringify(localStore));
-        }
+        await window.PiZeroServices?.predictions?.mergeRemote(user.id,remotePredictions,remoteTestPeriods);
+
       } catch (_) {
         // Keep the local cache available if the Phase 1 schema/API is not deployed yet.
       }

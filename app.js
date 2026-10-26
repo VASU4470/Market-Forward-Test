@@ -67,6 +67,17 @@ let resultSelection = null;
 let serverDashboardState = {status:'idle', statistics:null, progress:null, ranking:[]};
 
 function saveRoot(){ localStorage.setItem(ROOT_KEY, JSON.stringify(root)); }
+window.addEventListener('mft:sync-updated', () => {
+  root = JSON.parse(localStorage.getItem(ROOT_KEY) || '{"profiles":{},"activeProfile":null}');
+  if (root.activeProfile && root.profiles[root.activeProfile]) { ensureProfileState(activeProfile()); renderAll(); }
+});
+window.addEventListener('storage', event => { if (event.key===ROOT_KEY) window.dispatchEvent(new Event('mft:sync-updated')); });
+async function syncCloud() {
+  const userId=activeProfile()?.supabaseUserId;
+  if (userId && window.__MFT_SUPABASE_CLIENT && window.PiZeroServices?.predictions) {
+    await window.PiZeroServices.predictions.migrateLocalPredictions(userId,selectedIndexId);
+  }
+}
 function activeProfile(){ return root.activeProfile ? root.profiles[root.activeProfile] : null; }
 function activeState(){ return activeProfile()?.state || null; }
 function current(){ return activeState()?.predictions.find(p => p.date === dateKey && (p.indexId || 'local-nifty50') === selectedIndexId); }
@@ -93,14 +104,14 @@ function ensureProfileState(profile){
 
 function activeForwardTest(){
   const tests = activeState()?.forwardTests || [];
-  return [...tests].reverse().find(test => test.status === 'active') || null;
+  return [...tests].reverse().find(test => ['active','scheduled'].includes(test.status)) || null;
 }
 
 function forwardTestSessions(test){
   if (!test) return 0;
   const endedAt = test.stoppedAt || test.completedAt;
   const days = new Set(activeState().predictions
-    .filter(p => p.date >= test.startDate && p.date <= dateKey && p.lockedAt && new Date(p.lockedAt) >= new Date(test.startedAt) && (!endedAt || new Date(p.lockedAt) <= new Date(endedAt)))
+    .filter(p => (!p.testPeriodId || p.testPeriodId === test.id) && (!p.testPeriodCloudId || p.testPeriodCloudId === test.cloudId) && p.date >= test.startDate && p.date <= dateKey && p.lockedAt && new Date(p.lockedAt) >= new Date(test.startedAt) && (!endedAt || new Date(p.lockedAt) <= new Date(endedAt)))
     .map(p => p.date));
   return days.size;
 }
@@ -120,10 +131,8 @@ function renderForwardTest(){
     const done = count >= test.targetSessions;
     const scheduled = test.startDate > dateKey;
     if (done && test.status !== 'completed') {
-      test.status = 'completed'; test.completedAt = new Date().toISOString();
-      if (test.cloudId && window.PiZeroServices?.testPeriods) {
-        window.PiZeroServices.testPeriods.update(test.cloudId, {status:'completed', end_date:dateKey, completed_at:test.completedAt}).catch(() => {});
-      }
+      test.status = 'completed'; test.completedAt = new Date().toISOString(); test.endDate=dateKey;
+      test.cloudSync='pending'; saveRoot(); syncCloud().catch(()=>{});
     }
     panel.innerHTML = `<div class="forward-test-head"><div><span class="section-kicker">YOUR FORWARD TEST</span><h2 id="forwardTestTitle">${done ? 'Test complete' : scheduled ? 'Test scheduled' : 'Test in progress'}</h2><p>${test.targetSessions} market sessions · starts ${displayDateKey(test.startDate)}</p></div><span class="panel-note">${done ? 'COMPLETE' : scheduled ? 'SCHEDULED' : 'ACTIVE'}</span></div>
       <div class="forward-test-status"><strong>${count} / ${test.targetSessions}</strong><div class="forward-test-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${test.targetSessions}" aria-valuenow="${Math.min(count,test.targetSessions)}"><span style="width:${Math.min(100,Math.round(count/test.targetSessions*100))}%"></span></div><span class="forward-test-copy">${done ? 'Recorded sessions reached your goal.' : scheduled ? `Begins ${displayDateKey(test.startDate)}.` : 'Unique market dates with a prediction.'}</span></div>
@@ -150,33 +159,26 @@ document.addEventListener('submit', async event => {
   if (activeForwardTest() && !confirm('Start a new test? The current test will be marked stopped, and its record will be kept.')) return;
   const previous = activeForwardTest();
   if (previous) {
-    previous.status = 'stopped'; previous.stoppedAt = new Date().toISOString();
-    if (previous.cloudId && window.PiZeroServices?.testPeriods) {
-      window.PiZeroServices.testPeriods.update(previous.cloudId, {status:'stopped', end_date:dateKey}).catch(() => {});
-    }
+    previous.status = 'stopped'; previous.stoppedAt = new Date().toISOString(); previous.endDate=dateKey;
+    previous.cloudSync='pending';
   }
-  const test = {id:`test-${Date.now()}`, startDate, targetSessions, startedAt:new Date().toISOString(), status:'active'};
+  const test = {id:`test-${Date.now()}`, startDate, targetSessions, startedAt:new Date().toISOString(), status:startDate>dateKey?'scheduled':'active'};
   tests.push(test);
-  if (window.__MFT_SUPABASE_CLIENT && window.PiZeroServices?.testPeriods) {
-    try {
-      const cloud = await window.PiZeroServices.testPeriods.create({start_date:startDate, duration_sessions:targetSessions});
-      test.cloudId = cloud?.id || null;
-    } catch (_) { test.cloudSync = 'pending'; }
-  }
+  test.cloudSync='pending';
+  saveRoot();
+  await syncCloud().catch(()=>{});
   saveRoot(); renderAll();
 });
 
-document.addEventListener('click', event => {
+document.addEventListener('click', async event => {
   if (!event.target.closest('#newForwardTest')) return;
   const test = activeForwardTest();
   if (test && !confirm('Set up another test? The current test will be marked stopped, and its record will be kept.')) return;
   if (test) {
-    test.status = 'stopped'; test.stoppedAt = new Date().toISOString();
-    if (test.cloudId && window.PiZeroServices?.testPeriods) {
-      window.PiZeroServices.testPeriods.update(test.cloudId, {status:'stopped', end_date:dateKey}).catch(() => {});
-    }
+    test.status = 'stopped'; test.stoppedAt = new Date().toISOString(); test.endDate=dateKey;
+    test.cloudSync='pending';
   }
-  saveRoot(); renderAll();
+  saveRoot(); await syncCloud().catch(()=>{}); renderAll();
 });
 
 function migrateLegacyIfNeeded(profile){
@@ -347,30 +349,20 @@ $('predictionForm').addEventListener('submit', e => {
 
 $('cancelLock').onclick = () => $('lockDialog').close();
 
-$('confirmLock').onclick = async () => {
+async function lockPendingPrediction() {
   if (!pendingPrediction) return;
   const state = activeState();
-  const prediction = { date:dateKey, indexId:selectedIndexId, ...pendingPrediction, lockedAt:new Date().toISOString(), actual:null, score:null };
+  const period=activeForwardTest();
+  const prediction = {date:dateKey,indexId:selectedIndexId,...pendingPrediction,lockedAt:new Date().toISOString(),actual:null,score:null,
+    clientId:window.PiZeroServices.predictions.localId(),cloudOrigin:'live',cloudSync:'pending',testPeriodId:period && period.startDate<=dateKey?period.id:null};
   state.predictions.push(prediction);
-  try {
-    if (window.PiZeroServices?.predictions && window.__MFT_SUPABASE_CLIENT) {
-      const cloudPrediction = await window.PiZeroServices.predictions.createPrediction({
-        index_id: selectedIndexId,
-        trading_date: prediction.date,
-        bias: prediction.bias,
-        opening_view: prediction.opening,
-        day_type: prediction.dayType,
-        support: Number(prediction.support),
-        resistance: Number(prediction.resistance)
-      });
-      prediction.cloudId = cloudPrediction?.id || null;
-      prediction.cloudSync = 'synced';
-    }
-  } catch (_) {
-    prediction.cloudSync = 'pending';
-  }
-  saveRoot(); $('lockDialog').close(); pendingPrediction=null; renderAll();
-};
+  pendingPrediction=null;
+  saveRoot(); // Durable before the network; an interrupted upload never loses the prediction.
+  $('lockDialog').close(); renderAll();
+  await syncCloud().catch(()=>{});
+  renderAll();
+}
+$('confirmLock').onclick = lockPendingPrediction;
 
 $('actualForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -459,12 +451,12 @@ function renderResult(){
     const d=p.score.detail;
     const metrics=[['Bias',d.bias,25],['Open',d.opening,20],['Day',d.dayType,20],['Support',d.support,17.5],['Resistance',d.resistance,17.5]];
     $('scoreBreakdown').innerHTML=metrics.map(([n,v,max])=>`<div class="metric"><b>${Math.round(v)}/${max}</b><small>${n}</small></div>`).join('');
-    const source = p.score.source === 'server' || p.score.rule_version ? 'Server scored' : 'Local migration fallback · not included in server statistics';
+    const source = p.verificationStatus !== 'verified' ? 'Historical / unverified · excluded from verified rankings' : p.score.source === 'server' || p.score.rule_version ? 'Server scored' : 'Local migration fallback · not included in server statistics';
     $('scoreSource').textContent = `${source}${p.score.rule_version ? ` · ${escapeHtml(p.score.rule_version)}` : ''}`;
     $('scoreSource').className = `score-source ${p.score.source === 'server' || p.score.rule_version ? 'server' : 'local'}`;
     $('scoreInsight').textContent = p.score.total>=80 ? 'Excellent market read today.' : p.score.total>=60 ? 'Good read, with room to improve.' : 'Today exposed useful gaps in your market read.';
-    $('actualBias').value=p.actual.bias; $('actualOpening').value=p.actual.opening; $('actualDayType').value=p.actual.dayType;
-    $('actualLow').value=p.actual.low; $('actualHigh').value=p.actual.high;
+    $('actualBias').value=p.actual?.bias; $('actualOpening').value=p.actual?.opening; $('actualDayType').value=p.actual?.dayType;
+    $('actualLow').value=p.actual?.low; $('actualHigh').value=p.actual?.high;
   } else {
     panel.classList.add('hidden');
     $('scoreSource').textContent = '';
@@ -606,8 +598,10 @@ function renderProfile(){
   $('profileNameHeading').textContent=p.name;
   $('profileDisplayName').textContent=p.name;
   $('profileEmail').textContent=p.email;
-  $('editName').value=p.name;
-  $('editEmail').value=p.email;
+  // Supabase owns a replacement profile form; synchronization must not try to
+  // repopulate the removed local-only inputs.
+  if ($('editName')) $('editName').value=p.name;
+  if ($('editEmail')) $('editEmail').value=p.email;
   $('profilePredictions').textContent=preds.length;
   $('profileScored').textContent=scored.length;
   $('profileBest').textContent=scored.length ? Math.max(...scored.map(x=>x.score.total)) : '—';

@@ -1,10 +1,13 @@
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from ..data.supabase_rest import insert, select, update
 from ..errors import ApiError
 
 
 def _validate_duration(value):
+    if isinstance(value,bool) or (isinstance(value,float) and not value.is_integer()):
+        raise ApiError(400, "TEST_PERIOD_INVALID", "Duration must be a whole number from 1 to 365.")
     try:
         duration = int(value)
     except (TypeError, ValueError):
@@ -27,15 +30,24 @@ def create_test_period(user, payload):
         "user_id": user["id"],
         "start_date": start_date,
         "duration_sessions": duration,
-        "status": "scheduled" if start_date > date.today().isoformat() else "active",
+        "status": "scheduled" if start_date > datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat() else "active",
     }
+    if payload.get('client_key'):
+        key = payload['client_key']
+        if not isinstance(key,str) or not 1 <= len(key) <= 128:
+            raise ApiError(400,'TEST_PERIOD_INVALID','Invalid synchronization key.')
+        data['client_key'] = key
+    if payload.get('status') in ('stopped','completed'):
+        data['status'] = payload['status']
+        data['end_date'] = payload.get('end_date')
+        data['completed_at'] = payload.get('completed_at')
     rows = insert("test_periods", user["token"], data) or []
     return rows[0] if isinstance(rows, list) and rows else rows
 
 
 def get_my_test_periods(user):
     return select("test_periods", user["token"], {
-        "select": "id,start_date,duration_sessions,end_date,status,created_at,completed_at",
+        "select": "id,start_date,duration_sessions,end_date,status,created_at,completed_at,client_key",
         "user_id": f"eq.{user['id']}",
         "order": "created_at.desc",
     })

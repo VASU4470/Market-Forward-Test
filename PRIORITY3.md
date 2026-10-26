@@ -1,5 +1,7 @@
 # Priority 3 deployment and operations
 
+**Review branch remediation:** read `REMEDIATION_POLICY.md` and `docs/REMEDIATION_REVIEW.md` before any future rollout. They supersede the original eligibility paragraph below: historical scores are retained, while verified aggregates now enforce a dated session-open deadline. The new migration follows this original Phase 3 migration. Neither it nor the existing deployment/activation steps below was run against production by the remediation task.
+
 ## Deployment order
 
 1. Keep Render `MARKET_COLLECTION_ENABLED=false` during rollout (the default).
@@ -86,8 +88,9 @@ internal calculation. The unique index/date constraint is stronger than the
 provider/index/date constraint: another provider cannot create a second canonical
 result. Duplicate publication returns the original session; it never replaces it.
 Scores reference that session, and scored values/timestamps stay unchanged.
-Historical-import eligibility is preserved; this change does not introduce new
-lock-deadline rules or retroactively invalidate predictions.
+Historical grades remain available. The reviewed remediation adds explicit
+deadline/provenance labels and excludes historical/unverified grades from verified
+statistics without deleting predictions, test records or existing scores.
 
 Stored results include provider, instrument, date, timeframe, previous close,
 OHLC, session window, fetch time/status, raw responses and methodology/calendar

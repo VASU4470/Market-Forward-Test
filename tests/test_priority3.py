@@ -122,6 +122,7 @@ class Priority3Tests(unittest.TestCase):
     def test_daily_close_is_not_replaced_by_last_intraday_close(self):
         raw = fixture()
         raw['daily']['data']['candles'][1][4] = 102
+        raw['intraday']['data']['candles'][-1][4] = 101.99
         self.assertEqual(self.normalize(raw)['close'], 102)
 
     def test_weekends_holidays_and_special_sessions(self):
